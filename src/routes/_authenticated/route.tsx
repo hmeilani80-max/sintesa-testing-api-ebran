@@ -17,6 +17,12 @@
 // Edit freely. This file is only re-injected when deleted entirely.
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { supabase } from '@/integrations/supabase/client'
+import { AppShell } from '@/components/app-shell'
+import { SituationProvider } from '@/features/situasi/context'
+import { StrategyProvider } from '@/features/strategi/context'
+import { AksiProvider } from '@/features/aksi/context'
+import { TugasProvider } from '@/features/aksi/tugas-context'
+import { ArsipProvider } from '@/features/arsip/context'
 
 // Lovable's Supabase auth scaffolds use `/auth`; change this if the app uses another sign-in route.
 const SIGN_IN_ROUTE = '/auth'
@@ -30,5 +36,5 @@ export const Route = createFileRoute('/_authenticated')({
     }
     return { user: data.user }
   },
-  component: () => <Outlet />,
+  component: () => <SituationProvider><StrategyProvider><AksiProvider><TugasProvider><ArsipProvider><AppShell><Outlet /></AppShell></ArsipProvider></TugasProvider></AksiProvider></StrategyProvider></SituationProvider>,
 })

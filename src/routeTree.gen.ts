@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdministrasiRouteImport } from './routes/_authenticated/administrasi'
 import { Route as AuthenticatedAksiRouteImport } from './routes/_authenticated/aksi'
@@ -41,41 +42,45 @@ import { Route as AuthenticatedSituasiSlugEksplorasiRouteImport } from './routes
 import { Route as AuthenticatedSituasiSlugRisikoPrediksiRouteImport } from './routes/_authenticated/situasi.$slug.risiko-prediksi'
 import { Route as AuthenticatedAksiPersetujuanKindIdRouteImport } from './routes/_authenticated/aksi.persetujuan.$kind.$id'
 
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/_authenticated/',
-  path: '/',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAdministrasiRoute =
   AuthenticatedAdministrasiRouteImport.update({
-    id: '/_authenticated/administrasi',
+    id: '/administrasi',
     path: '/administrasi',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAksiRoute = AuthenticatedAksiRouteImport.update({
-  id: '/_authenticated/aksi',
+  id: '/aksi',
   path: '/aksi',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedArsipRoute = AuthenticatedArsipRouteImport.update({
-  id: '/_authenticated/arsip',
+  id: '/arsip',
   path: '/arsip',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDampakRoute = AuthenticatedDampakRouteImport.update({
-  id: '/_authenticated/dampak',
+  id: '/dampak',
   path: '/dampak',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSituasiRoute = AuthenticatedSituasiRouteImport.update({
-  id: '/_authenticated/situasi',
+  id: '/situasi',
   path: '/situasi',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedStrategiRoute = AuthenticatedStrategiRouteImport.update({
-  id: '/_authenticated/strategi',
+  id: '/strategi',
   path: '/strategi',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAdministrasiIndexRoute =
   AuthenticatedAdministrasiIndexRouteImport.update({
@@ -222,13 +227,13 @@ const AuthenticatedAksiPersetujuanKindIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
   '/administrasi': typeof AuthenticatedAdministrasiRouteWithChildren
   '/aksi': typeof AuthenticatedAksiRouteWithChildren
   '/arsip': typeof AuthenticatedArsipRoute
   '/dampak': typeof AuthenticatedDampakRoute
   '/situasi': typeof AuthenticatedSituasiRouteWithChildren
   '/strategi': typeof AuthenticatedStrategiRouteWithChildren
-  '/': typeof AuthenticatedIndexRoute
   '/administrasi/akun-sosial': typeof AuthenticatedAdministrasiAkunSosialRoute
   '/aksi/distribusi-news': typeof AuthenticatedAksiDistribusiNewsRouteWithChildren
   '/aksi/distribusi-sosial': typeof AuthenticatedAksiDistribusiSosialRouteWithChildren
@@ -280,6 +285,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/administrasi': typeof AuthenticatedAdministrasiRouteWithChildren
   '/_authenticated/aksi': typeof AuthenticatedAksiRouteWithChildren
   '/_authenticated/arsip': typeof AuthenticatedArsipRoute
@@ -315,13 +321,13 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/administrasi'
     | '/aksi'
     | '/arsip'
     | '/dampak'
     | '/situasi'
     | '/strategi'
-    | '/'
     | '/administrasi/akun-sosial'
     | '/aksi/distribusi-news'
     | '/aksi/distribusi-sosial'
@@ -372,6 +378,7 @@ export interface FileRouteTypes {
     | '/aksi/persetujuan/$kind/$id'
   id:
     | '__root__'
+    | '/_authenticated'
     | '/_authenticated/administrasi'
     | '/_authenticated/aksi'
     | '/_authenticated/arsip'
@@ -406,65 +413,66 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AuthenticatedAdministrasiRoute: typeof AuthenticatedAdministrasiRouteWithChildren
-  AuthenticatedAksiRoute: typeof AuthenticatedAksiRouteWithChildren
-  AuthenticatedArsipRoute: typeof AuthenticatedArsipRoute
-  AuthenticatedDampakRoute: typeof AuthenticatedDampakRoute
-  AuthenticatedSituasiRoute: typeof AuthenticatedSituasiRouteWithChildren
-  AuthenticatedStrategiRoute: typeof AuthenticatedStrategiRouteWithChildren
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/administrasi': {
       id: '/_authenticated/administrasi'
       path: '/administrasi'
       fullPath: '/administrasi'
       preLoaderRoute: typeof AuthenticatedAdministrasiRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/aksi': {
       id: '/_authenticated/aksi'
       path: '/aksi'
       fullPath: '/aksi'
       preLoaderRoute: typeof AuthenticatedAksiRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/arsip': {
       id: '/_authenticated/arsip'
       path: '/arsip'
       fullPath: '/arsip'
       preLoaderRoute: typeof AuthenticatedArsipRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dampak': {
       id: '/_authenticated/dampak'
       path: '/dampak'
       fullPath: '/dampak'
       preLoaderRoute: typeof AuthenticatedDampakRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/situasi': {
       id: '/_authenticated/situasi'
       path: '/situasi'
       fullPath: '/situasi'
       preLoaderRoute: typeof AuthenticatedSituasiRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/strategi': {
       id: '/_authenticated/strategi'
       path: '/strategi'
       fullPath: '/strategi'
       preLoaderRoute: typeof AuthenticatedStrategiRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/administrasi/': {
       id: '/_authenticated/administrasi/'
@@ -799,7 +807,17 @@ const AuthenticatedStrategiRouteWithChildren =
     AuthenticatedStrategiRouteChildren,
   )
 
-const rootRouteChildren: RootRouteChildren = {
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdministrasiRoute: typeof AuthenticatedAdministrasiRouteWithChildren
+  AuthenticatedAksiRoute: typeof AuthenticatedAksiRouteWithChildren
+  AuthenticatedArsipRoute: typeof AuthenticatedArsipRoute
+  AuthenticatedDampakRoute: typeof AuthenticatedDampakRoute
+  AuthenticatedSituasiRoute: typeof AuthenticatedSituasiRouteWithChildren
+  AuthenticatedStrategiRoute: typeof AuthenticatedStrategiRouteWithChildren
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdministrasiRoute: AuthenticatedAdministrasiRouteWithChildren,
   AuthenticatedAksiRoute: AuthenticatedAksiRouteWithChildren,
   AuthenticatedArsipRoute: AuthenticatedArsipRoute,
@@ -807,6 +825,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedSituasiRoute: AuthenticatedSituasiRouteWithChildren,
   AuthenticatedStrategiRoute: AuthenticatedStrategiRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

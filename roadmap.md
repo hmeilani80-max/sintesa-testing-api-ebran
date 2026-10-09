@@ -1,0 +1,27 @@
+# SPEKTRA POC Roadmap
+
+- [x] Shared navigation and visual system
+- [x] Executive home briefing
+- [x] Situation, Strategy, Action, Impact, Archive, and Administration skeletons
+- [x] Prototype interactions and responsive layouts
+- [x] Route metadata, navigation tests, and preview verification
+- [x] Build Ringkasan Situasi analytical workspace
+- [x] Build Eksplorasi Situasi tabs and actor network
+- [x] Build Risiko & Prediksi workspace
+- [x] Verify filters, detail drawers, routes, and responsive layouts
+- [x] Revise Situasi entry into EWS and monitored-topic catalogue
+- [x] Add shared detail workspace for EWS and monitored topics
+- [x] Add create-topic and monitor-EWS prototype interactions
+- [x] Update routing tests and verify desktop/mobile flows
+- [x] Refocus Risiko & Prediksi on the active situation only
+- [x] Add persistent breadcrumbs and situation switching to detail pages
+- [x] Verify per-situation risk content and responsive layouts
+- [x] Build Strategi list, create flow (from Situasi / manual), and detail workspace
+- [x] Channel-based recommendations, scenarios, action plan, and hand-off to Aksi
+- [x] Aksi: Produksi, Persetujuan, Distribusi Sosial, Distribusi News dengan gerbang approval dan jejak sumber
+- [x] Revisi Distribusi Sosial: pilihan asset, preview konsisten, rekomendasi target/waktu/skala, copy kontekstual, dan review
+- [x] Verifikasi revisi hingga persetujuan dan simulasi eksekusi
+- [x] Gunakan domain sesuai nama sebagai identitas 39 kanal Distribusi News
+- [x] Revisi Dampak tanpa redesign: label, timeline, tautan respons, drilldown narasi, dan jenis laporan; verifikasi alur
+- [x] Arsip & Pengetahuan: pencarian isi, repository, detail (provenance, versi, audit, akses, retention), upload, kepatuhan
+- [x] Branding SINTESA dan warna merek #B33A50 terbatas

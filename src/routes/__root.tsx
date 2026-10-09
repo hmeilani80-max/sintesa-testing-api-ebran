@@ -10,14 +10,8 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
-import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { SituationProvider } from "@/features/situasi/context";
-import { StrategyProvider } from "@/features/strategi/context";
-import { AksiProvider } from "@/features/aksi/context";
-import { TugasProvider } from "@/features/aksi/tugas-context";
-import { ArsipProvider } from "@/features/arsip/context";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -132,7 +126,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <SituationProvider><StrategyProvider><AksiProvider><TugasProvider><ArsipProvider><AppShell><Outlet /></AppShell><Toaster /></ArsipProvider></TugasProvider></AksiProvider></StrategyProvider></SituationProvider>
+      <Outlet /><Toaster />
     </QueryClientProvider>
   );
 }

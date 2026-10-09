@@ -8,6 +8,13 @@
       "when": 1791536885571,
       "tag": "0000_create_app_state",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791538602930,
+      "tag": "0001_app_state_authenticated_only",
+      "breakpoints": true
     }
   ]
 }

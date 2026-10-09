@@ -1,6 +1,7 @@
 import type React from "react";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
+import { field, useCloudState } from "@/hooks/use-cloud-state";
 import { monitoredTopics, systemFindings, type SituationEntry } from "./data";
 
 type NewTopic = Pick<SituationEntry, "name" | "description" | "keywords" | "platforms">;
@@ -20,8 +21,10 @@ function slugify(value: string) {
 }
 
 export function SituationProvider({ children }: { children: ReactNode }) {
-  const [monitoredSlugs, setMonitoredSlugs] = useState<string[]>([]);
-  const [createdTopics, setCreatedTopics] = useState<SituationEntry[]>([]);
+  const [cloud, setCloud] = useCloudState("situasi", { monitoredSlugs: [] as string[], createdTopics: [] as SituationEntry[] });
+  const { monitoredSlugs, createdTopics } = cloud;
+  const setMonitoredSlugs = field(setCloud, "monitoredSlugs");
+  const setCreatedTopics = field(setCloud, "createdTopics");
 
   const topics = useMemo(() => [
     ...monitoredTopics,

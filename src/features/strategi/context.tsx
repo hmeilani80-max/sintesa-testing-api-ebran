@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
+import { field, useCloudState } from "@/hooks/use-cloud-state";
 import { getActionPlan, getChannelApproach, initialStrategies, slugify, type Strategy, type StrategyTask } from "./data";
 
 type Handoff = { strategySlug: string; title: string; situationName?: string | undefined; tasks: StrategyTask[] };
@@ -17,8 +18,10 @@ const g = globalThis as unknown as { __spektraStrategyCtx?: React.Context<Value 
 const Ctx = g.__spektraStrategyCtx ?? (g.__spektraStrategyCtx = createContext<Value | undefined>(undefined));
 
 export function StrategyProvider({ children }: { children: ReactNode }) {
-  const [strategies, setStrategies] = useState(initialStrategies);
-  const [handoffs, setHandoffs] = useState<Handoff[]>([]);
+  const [cloud, setCloud] = useCloudState("strategi", { strategies: initialStrategies, handoffs: [] as Handoff[] });
+  const { strategies, handoffs } = cloud;
+  const setStrategies = field(setCloud, "strategies");
+  const setHandoffs = field(setCloud, "handoffs");
 
   const value = useMemo<Value>(() => ({
     strategies,

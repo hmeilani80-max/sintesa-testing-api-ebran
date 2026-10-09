@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
+import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
   applyDecision, applySubmit, buildItems, canSubmit, invalidateApproval, generateContent, initialOrders, initialProductions,
   type ApprovalStatus, type Campaign, type ChannelOrder, type HistoryEntry, type NewsOrder, type NewsStatus, type OutputType, type ProductionBrief, type ProductionContent, type ProductionItem,
@@ -44,11 +45,16 @@ const now = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minu
 const GENERATION_MS = 1400;
 
 export function AksiProvider({ children }: { children: ReactNode }) {
-  const [productions, setProductions] = useState(initialProductions);
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [orders, setOrders] = useState(initialOrders);
-  const [accounts, setAccounts] = useState(SOCIAL_ACCOUNTS);
-  const [log, setLog] = useState<LogEntry[]>([{ at: "10:05", text: "Publikasi Artikel Demonstrasi diajukan oleh Tim Media" }]);
+  const [cloud, setCloud] = useCloudState("aksi", {
+    productions: initialProductions, campaigns: initialCampaigns, orders: initialOrders, accounts: SOCIAL_ACCOUNTS,
+    log: [{ at: "10:05", text: "Publikasi Artikel Demonstrasi diajukan oleh Tim Media" }] as LogEntry[],
+  });
+  const { productions, campaigns, orders, accounts, log } = cloud;
+  const setProductions = field(setCloud, "productions");
+  const setCampaigns = field(setCloud, "campaigns");
+  const setOrders = field(setCloud, "orders");
+  const setAccounts = field(setCloud, "accounts");
+  const setLog = field(setCloud, "log");
   const audit = (text: string) => setLog((cur) => [{ at: now(), text }, ...cur].slice(0, 30));
   const patch = (id: string, fn: (p: ProductionItem) => ProductionItem) => setProductions((cur) => cur.map((p) => (p.id === id ? { ...fn(p), updated: "Baru saja" } : p)));
   const editCampaign = (id: string, fn: (c: Campaign) => Campaign) => setCampaigns((cur) => cur.map((c) => (c.id === id ? fn(c) : c)));

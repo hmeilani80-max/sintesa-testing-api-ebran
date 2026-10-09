@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+# AGENTS
+
+- Situasi, Strategi and Aksi state persists as JSON snapshots in the `app_state` table via `useCloudState`; keeps existing in-memory logic unchanged while surviving reloads.

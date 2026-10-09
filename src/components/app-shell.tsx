@@ -36,6 +36,7 @@ import { highEwsNotifications } from "@/features/situasi/data";
 import { useTugas } from "@/features/aksi/tugas-context";
 import { taskNotifications } from "@/features/aksi/tugas";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -228,6 +229,8 @@ function Topbar() {
             <DropdownMenuSeparator />
             <DropdownMenuItem>Profil</DropdownMenuItem>
             <DropdownMenuItem>Preferensi</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => { void supabase.auth.signOut().finally(() => { window.location.assign("/auth"); }); }}>Keluar</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

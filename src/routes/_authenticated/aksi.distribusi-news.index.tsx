@@ -15,7 +15,7 @@ import { findOutput, useAksi } from "@/features/aksi/context";
 import { deadlineFor, isEligible, NATIONAL_CHANNEL, NEWS_CHANNELS, newsChannelDomain, recommendedScheduleFor, REGIONAL_CHANNELS, type NewsStatus } from "@/features/aksi/data";
 import { aksiHead } from "@/features/aksi/meta";
 
-export const Route = createFileRoute("/aksi/distribusi-news/")({
+export const Route = createFileRoute("/_authenticated/aksi/distribusi-news/")({
   head: aksiHead("Distribusi News", "Order distribusi konten News ke jaringan 38 kanal wilayah dan 1 kanal nasional."),
   component: DistribusiNews,
 });

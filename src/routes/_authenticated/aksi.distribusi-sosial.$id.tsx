@@ -10,7 +10,7 @@ import { aksiHead } from "@/features/aksi/meta";
 import { canExecute, canSubmitDistribution, isEditable, periodLabel, readinessChecks } from "@/features/aksi/sosial";
 import { ChecksView, PostsBrowser } from "@/features/aksi/sosial-components";
 
-export const Route = createFileRoute("/aksi/distribusi-sosial/$id")({
+export const Route = createFileRoute("/_authenticated/aksi/distribusi-sosial/$id")({
   head: aksiHead("Detail Distribusi", "Ringkasan, paket publikasi, persetujuan, eksekusi, dan riwayat distribusi sosial."),
   component: DistributionDetail,
 });

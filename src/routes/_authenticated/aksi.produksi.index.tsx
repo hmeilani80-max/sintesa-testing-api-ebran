@@ -18,7 +18,7 @@ import { useStrategies } from "@/features/strategi/context";
 import type { Strategy } from "@/features/strategi/data";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/aksi/produksi/")({
+export const Route = createFileRoute("/_authenticated/aksi/produksi/")({
   head: aksiHead("Produksi", "Kelola pembuatan konten berbasis strategi dan brief, dari generation hingga siap diajukan untuk persetujuan."),
   component: Produksi,
 });

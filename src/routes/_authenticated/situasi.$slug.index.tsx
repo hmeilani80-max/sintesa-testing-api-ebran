@@ -10,7 +10,7 @@ import { useSituations } from "@/features/situasi/context";
 import { useArsip } from "@/features/arsip/context";
 import { actors, narratives, records, regions, sentiment, trend, type DetailRecord } from "@/features/situasi/data";
 
-export const Route = createFileRoute("/situasi/$slug/")({
+export const Route = createFileRoute("/_authenticated/situasi/$slug/")({
   head: ({ params }) => ({ meta: [
     { title: `Ringkasan ${params.slug.replaceAll("-", " ")} — SINTESA` },
     { name: "description", content: "Ringkasan metrik, tren, aktor, narasi, sentimen, wilayah, dan data detail situasi." },

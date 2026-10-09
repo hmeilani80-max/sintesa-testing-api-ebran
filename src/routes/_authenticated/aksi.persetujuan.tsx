@@ -1,3 +1,3 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/aksi/persetujuan")({ component: () => <Outlet /> });
+export const Route = createFileRoute("/_authenticated/aksi/persetujuan")({ component: () => <Outlet /> });

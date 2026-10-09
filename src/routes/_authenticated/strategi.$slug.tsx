@@ -15,7 +15,7 @@ import { approachPlatforms, useStrategies } from "@/features/strategi/context";
 import { channelRoles, getActionPlan, getChannelApproach, getStrategyContext, insights, scenarios, sources, studyFacts, type ChannelApproach } from "@/features/strategi/data";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/strategi/$slug")({
+export const Route = createFileRoute("/_authenticated/strategi/$slug")({
   head: () => ({ meta: [
     { title: "Detail Strategi — SINTESA" },
     { name: "description", content: "Workspace keputusan: konteks, kajian, rekomendasi kanal, dan action plan." },

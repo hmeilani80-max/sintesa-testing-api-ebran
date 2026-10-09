@@ -22,7 +22,7 @@ function fmtOrNA(n: number | undefined, unit = "") {
   return n === undefined ? NOT_AVAILABLE : `${fmt(n)}${unit}`;
 }
 
-export const Route = createFileRoute("/dampak")({
+export const Route = createFileRoute("/_authenticated/dampak")({
   head: () => ({
     meta: [
       { title: "Dampak — SINTESA" },

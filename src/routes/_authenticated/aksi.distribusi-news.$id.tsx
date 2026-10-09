@@ -8,7 +8,7 @@ import { findOutput, useAksi } from "@/features/aksi/context";
 import { distributionReadiness, newsChannelDomain } from "@/features/aksi/data";
 import { aksiHead } from "@/features/aksi/meta";
 
-export const Route = createFileRoute("/aksi/distribusi-news/$id")({
+export const Route = createFileRoute("/_authenticated/aksi/distribusi-news/$id")({
   head: aksiHead("Detail Order Distribusi", "Kanal tujuan, approval distribusi, pengiriman order, dan verifikasi URL tayang."),
   component: OrderDetail,
 });

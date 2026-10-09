@@ -14,7 +14,7 @@ import { useSituations } from "@/features/situasi/context";
 import { getEws, type SituationEntry } from "@/features/situasi/data";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/situasi/")({
+export const Route = createFileRoute("/_authenticated/situasi/")({
   head: () => ({ meta: [
     { title: "Situasi — SINTESA" },
     { name: "description", content: "Pantau temuan sistem dan topik strategis yang sedang dipantau." },

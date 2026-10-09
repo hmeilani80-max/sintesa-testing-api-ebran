@@ -13,7 +13,7 @@ import { getRiskProfile, trend, warningHistory } from "@/features/situasi/data";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/situasi/$slug/risiko-prediksi")({
+export const Route = createFileRoute("/_authenticated/situasi/$slug/risiko-prediksi")({
   head: ({ params }) => ({ meta: [
     { title: `Risiko & Prediksi ${params.slug.replaceAll("-", " ")} — SINTESA` },
     { name: "description", content: "Tingkat risiko, faktor pendorong, early warning, dan proyeksi untuk situasi aktif." },

@@ -17,7 +17,7 @@ import { buildPosts, canSubmitDistribution, groupsOf, labelsOf, PLATFORM_WINDOWS
 import { AssetThumb, ChecksView, PostMock, PostsBrowser } from "@/features/aksi/sosial-components";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/aksi/distribusi-sosial/baru")({
+export const Route = createFileRoute("/_authenticated/aksi/distribusi-sosial/baru")({
   head: aksiHead("Buat Distribusi", "Rencana, target, paket publikasi, dan review sebelum persetujuan distribusi sosial."),
   component: NewDistribution,
 });

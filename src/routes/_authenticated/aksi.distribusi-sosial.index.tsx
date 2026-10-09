@@ -10,7 +10,7 @@ import { aksiHead } from "@/features/aksi/meta";
 import { dayList, periodLabel, SOCIAL_PLATFORMS } from "@/features/aksi/sosial";
 import { selectCls } from "@/features/aksi/sosial-components";
 
-export const Route = createFileRoute("/aksi/distribusi-sosial/")({
+export const Route = createFileRoute("/_authenticated/aksi/distribusi-sosial/")({
   head: aksiHead("Distribusi Sosial", "Kelola penyebaran konten yang telah disetujui ke akun media sosial yang terhubung."),
   component: DistribusiSosial,
 });

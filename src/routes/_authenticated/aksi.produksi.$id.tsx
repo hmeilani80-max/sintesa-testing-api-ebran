@@ -11,7 +11,7 @@ import { aksiHead } from "@/features/aksi/meta";
 import { ChecksList, ProductionWorkspace } from "@/features/aksi/production-workspaces";
 import { rencanaPublikasi } from "@/features/aksi/sosial";
 
-export const Route = createFileRoute("/aksi/produksi/$id")({
+export const Route = createFileRoute("/_authenticated/aksi/produksi/$id")({
   head: aksiHead("Workspace Produksi", "Generate, review, dan ajukan satu output konten ke Persetujuan."),
   component: ProduksiDetail,
 });

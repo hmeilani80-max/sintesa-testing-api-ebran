@@ -9,7 +9,7 @@ import { useSituations } from "@/features/situasi/context";
 import { useStrategies } from "@/features/strategi/context";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [
     { title: "Beranda Pimpinan — SINTESA" },
     { name: "description", content: "Ringkasan situasi, rekomendasi, respons berjalan, dan dampak terbaru untuk pimpinan." },

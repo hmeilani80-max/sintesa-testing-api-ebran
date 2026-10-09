@@ -8,7 +8,7 @@ import { useAksi, type QueueItem } from "@/features/aksi/context";
 import { aksiHead } from "@/features/aksi/meta";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/aksi/persetujuan/")({
+export const Route = createFileRoute("/_authenticated/aksi/persetujuan/")({
   head: aksiHead("Persetujuan", "Decision inbox untuk Persetujuan Konten dan Persetujuan Distribusi."),
   component: Persetujuan,
 });

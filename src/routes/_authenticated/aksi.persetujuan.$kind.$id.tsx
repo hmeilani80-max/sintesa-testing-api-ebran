@@ -12,7 +12,7 @@ import { aksiHead } from "@/features/aksi/meta";
 import { ChecksList, ContentPreview } from "@/features/aksi/production-workspaces";
 import { PostsBrowser } from "@/features/aksi/sosial-components";
 
-export const Route = createFileRoute("/aksi/persetujuan/$kind/$id")({
+export const Route = createFileRoute("/_authenticated/aksi/persetujuan/$kind/$id")({
   head: aksiHead("Detail Persetujuan", "Preview, konteks, hasil pemeriksaan otomatis, keputusan, dan riwayat keputusan."),
   component: Detail,
 });

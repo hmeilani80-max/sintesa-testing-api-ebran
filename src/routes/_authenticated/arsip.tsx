@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useArsip } from "@/features/arsip/context";
 import { analyzeFieldReport, buildFieldReportItem, COMPLIANCE, JENIS, KLASIFIKASI, MODUL, PROVENANCE, search, suggestForUpload, type AiFieldAnalysis, type ArsipItem, type Filters, type Jenis, type Klasifikasi, type VerificationFinding } from "@/features/arsip/data";
 
-export const Route = createFileRoute("/arsip")({
+export const Route = createFileRoute("/_authenticated/arsip")({
   head: () => ({
     meta: [
       { title: "Arsip & Pengetahuan — SINTESA" },

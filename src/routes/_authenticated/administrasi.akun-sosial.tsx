@@ -8,7 +8,7 @@ import { Stat, StatusPill, Trail } from "@/features/aksi/components";
 import { useAksi } from "@/features/aksi/context";
 import { ACCOUNT_ROLES, CONN_LABEL, groupsOf, labelsOf, PERMISSION_LABELS, ROLE_PERMISSIONS, type AccountRole, type SocialAccount } from "@/features/aksi/sosial";
 
-export const Route = createFileRoute("/administrasi/akun-sosial")({
+export const Route = createFileRoute("/_authenticated/administrasi/akun-sosial")({
   head: () => ({ meta: [{ title: "Pengelolaan Akun Sosial — SINTESA" }, { name: "description", content: "Kelola akun resmi, pengelompokan, label, dan hak akses untuk Distribusi Sosial." }] }),
   component: AkunSosial,
 });

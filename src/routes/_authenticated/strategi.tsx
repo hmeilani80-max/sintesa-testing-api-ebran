@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/strategi")({ component: StrategiLayout });
+export const Route = createFileRoute("/_authenticated/strategi")({ component: StrategiLayout });
 
 function StrategiLayout() {
   return <Outlet />;

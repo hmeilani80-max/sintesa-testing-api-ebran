@@ -16,7 +16,7 @@ import { PLATFORMS } from "@/features/strategi/data";
 import { StatusBadge } from "@/features/strategi/components";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/strategi/")({
+export const Route = createFileRoute("/_authenticated/strategi/")({
   head: () => ({ meta: [
     { title: "Strategi — SINTESA" },
     { name: "description", content: "Daftar strategi respons yang disusun dari situasi atau input manual." },

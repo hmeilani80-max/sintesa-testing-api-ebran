@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowUpRight, RadioTower } from "lucide-react";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
@@ -12,6 +12,7 @@ import { useSituations } from "@/features/situasi/context";
 import { getRiskProfile, trend, warningHistory } from "@/features/situasi/data";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/situasi/$slug/risiko-prediksi")({
   head: ({ params }) => ({ meta: [
@@ -32,7 +33,54 @@ function RiskForecast() {
   const { findings, topics } = useSituations();
   const situation = [...topics, ...findings].find((item) => item.slug === slug);
   if (!situation) throw notFound();
-  const profile = getRiskProfile(situation);
+  const [profile, setProfile] = useState(() => getRiskProfile(situation));
+  const [trendRows, setTrendRows] = useState<any[]>([...trend]);
+  const [historyRows, setHistoryRows] = useState<any[]>(warningHistory);
+
+  useEffect(() => {
+    let cancelled = false;
+    const db = supabase as any;
+    async function loadRiskData() {
+      const [riskResult, trendResult, ewsResult] = await Promise.all([
+        db.from("situasi_risk_profiles").select("*").eq("topic_slug", slug).maybeSingle(),
+        db.from("situasi_trend_points").select("*").eq("topic_slug", slug).order("period_date", { ascending: true }),
+        db.from("situasi_ews").select("slug").eq("topic_slug", slug).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const row = riskResult.data;
+      if (row) setProfile({
+        ...getRiskProfile(situation),
+        activeRegions: String(row.active_regions ?? 0),
+        warningCount: String(row.warning_count ?? 0),
+        newActors: row.new_actors ?? "—",
+        negativeSentiment: row.negative_sentiment ?? "—",
+        spreadPotential: row.spread_potential ?? situation.risk ?? "Sedang",
+        growingRegions: row.growing_regions ?? situation.regionScope,
+        drivingNarrative: row.driving_narrative ?? situation.dominantNarrative ?? situation.name,
+        factors: Array.isArray(row.factors) ? row.factors : [],
+        dimensions: Array.isArray(row.dimensions) ? row.dimensions : [],
+        warnings: Array.isArray(row.warnings) ? row.warnings : [],
+        riskDetails: Array.isArray(row.risk_details) ? row.risk_details : [],
+        unusualActivity: row.unusual_activity ?? "",
+      });
+      if (Array.isArray(trendResult.data) && trendResult.data.length) setTrendRows(trendResult.data.map((item: any) => ({
+        date: item.period_date,
+        actual: item.actual_volume,
+        forecast: item.forecast_volume,
+        volume: item.volume,
+      })));
+      if (ewsResult.data?.slug) {
+        const history = await db.from("situasi_ews_history").select("*").eq("ews_slug", ewsResult.data.slug).order("event_at", { ascending: true });
+        if (!cancelled && Array.isArray(history.data) && history.data.length) setHistoryRows(history.data.map((item: any) => ({
+          time: new Date(item.event_at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }),
+          event: item.event,
+          status: item.status,
+        })));
+      }
+    }
+    void loadRiskData().catch((error) => console.error("[Situasi] Gagal memuat data Risiko & Prediksi:", error));
+    return () => { cancelled = true; };
+  }, [slug, situation]);
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
   const [range, setRange] = useState("7 Hari");
   const choose = (value: string) => setFilters([{ type: "indikator", value }]);
@@ -71,7 +119,7 @@ function RiskForecast() {
           </div>
         </Panel>
         <Panel title="Proyeksi Volume" action={<div className="flex gap-1">{["7 Hari", "14 Hari", "30 Hari"].map((item) => <Button key={item} size="sm" variant={range === item ? "secondary" : "ghost"} onClick={() => setRange(item)}>{item}</Button>)}</div>}>
-          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto"><LineChart data={[...trend]}><CartesianGrid vertical={false} /><XAxis dataKey="date" /><YAxis /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} /><Line dataKey="forecast" stroke="var(--color-forecast)" strokeWidth={2} strokeDasharray="5 5" /></LineChart></ChartContainer>
+          <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto"><LineChart data={trendRows}><CartesianGrid vertical={false} /><XAxis dataKey="date" /><YAxis /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} /><Line dataKey="forecast" stroke="var(--color-forecast)" strokeWidth={2} strokeDasharray="5 5" /></LineChart></ChartContainer>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">Berdasarkan pola {situation.name} saat ini, volume percakapan diproyeksikan tetap {risk === "Tinggi" ? "tinggi" : "dinamis"} dalam {range.toLowerCase()} ke depan. Pertumbuhan tambahan dapat terjadi apabila narasi “{profile.drivingNarrative}” menguat atau muncul kejadian lapangan baru.</p>
         </Panel>
       </div>
@@ -85,7 +133,7 @@ function RiskForecast() {
 
       <Panel title="Riwayat Peringatan & Penanganan" description="Linimasa peringatan dan status penanganan dari sistem hingga respons operasional">
         <ol className="space-y-4 border-l border-border pl-5">
-          {warningHistory.map((item) => <li key={item.time + item.event} className="relative">
+          {historyRows.map((item) => <li key={item.time + item.event} className="relative">
             <span className="absolute -left-[26px] top-1 size-2.5 rounded-full border-2 border-card bg-primary" />
             <p className="text-xs font-medium text-muted-foreground">{item.time}</p>
             <p className="mt-0.5 text-sm">{item.event}</p>

@@ -31,6 +31,78 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      },
+      situasi_system_findings: {
+        Row: {
+          actor_count: number
+          created_at: string
+          description: string
+          detected_reason: string | null
+          dominant_narrative: string | null
+          growth: string | null
+          keywords: string[]
+          metadata: Json
+          name: string
+          narrative_count: number
+          platforms: string[]
+          region_scope: string
+          regions_growing: string | null
+          risk: string | null
+          since_label: string
+          slug: string
+          status: string
+          triggers: string[]
+          updated_at: string
+          volume: number
+          warning_status: string | null
+        }
+        Insert: {
+          actor_count?: number
+          created_at?: string
+          description?: string
+          detected_reason?: string | null
+          dominant_narrative?: string | null
+          growth?: string | null
+          keywords?: string[]
+          metadata?: Json
+          name: string
+          narrative_count?: number
+          platforms?: string[]
+          region_scope?: string
+          regions_growing?: string | null
+          risk?: string | null
+          since_label?: string
+          slug: string
+          status?: string
+          triggers?: string[]
+          updated_at?: string
+          volume?: number
+          warning_status?: string | null
+        }
+        Update: {
+          actor_count?: number
+          created_at?: string
+          description?: string
+          detected_reason?: string | null
+          dominant_narrative?: string | null
+          growth?: string | null
+          keywords?: string[]
+          metadata?: Json
+          name?: string
+          narrative_count?: number
+          platforms?: string[]
+          region_scope?: string
+          regions_growing?: string | null
+          risk?: string | null
+          since_label?: string
+          slug?: string
+          status?: string
+          triggers?: string[]
+          updated_at?: string
+          volume?: number
+          warning_status?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {

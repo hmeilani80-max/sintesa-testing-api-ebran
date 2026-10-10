@@ -32,6 +32,42 @@ export type Database = {
         }
         Relationships: []
       },
+      strategi_strategies: {
+        Row: { id: string; slug: string; title: string; source: string; situation_slug: string | null; situation_name: string | null; status: string; objective: string; context: string | null; audience: string | null; region: string | null; platforms: Json; approach: string | null; metadata: Json; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string; archived_at: string | null }
+        Insert: { id?: string; slug: string; title: string; source: string; situation_slug?: string | null; situation_name?: string | null; status?: string; objective?: string; context?: string | null; audience?: string | null; region?: string | null; platforms?: Json; approach?: string | null; metadata?: Json; created_by?: string | null; updated_by?: string | null; created_at?: string; updated_at?: string; archived_at?: string | null }
+        Update: { id?: string; slug?: string; title?: string; source?: string; situation_slug?: string | null; situation_name?: string | null; status?: string; objective?: string; context?: string | null; audience?: string | null; region?: string | null; platforms?: Json; approach?: string | null; metadata?: Json; created_by?: string | null; updated_by?: string | null; created_at?: string; updated_at?: string; archived_at?: string | null }
+        Relationships: []
+      },
+      strategi_strategy_versions: {
+        Row: { id: string; strategy_id: string; version_number: number; snapshot: Json; change_note: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; strategy_id: string; version_number: number; snapshot: Json; change_note?: string | null; created_by?: string | null; created_at?: string }
+        Update: { id?: string; strategy_id?: string; version_number?: number; snapshot?: Json; change_note?: string | null; created_by?: string | null; created_at?: string }
+        Relationships: []
+      },
+      strategi_approval_events: {
+        Row: { id: string; strategy_id: string; version_number: number | null; event_type: string; reviewer_id: string | null; reviewer_label: string | null; note: string | null; created_by: string | null; created_at: string }
+        Insert: { id?: string; strategy_id: string; version_number?: number | null; event_type: string; reviewer_id?: string | null; reviewer_label?: string | null; note?: string | null; created_by?: string | null; created_at?: string }
+        Update: { id?: string; strategy_id?: string; version_number?: number | null; event_type?: string; reviewer_id?: string | null; reviewer_label?: string | null; note?: string | null; created_by?: string | null; created_at?: string }
+        Relationships: []
+      },
+      strategi_evidence_sources: {
+        Row: { id: string; strategy_id: string; statement: string; source_name: string; platform: string | null; source_url: string | null; source_time: string | null; verification_status: string; classification: string; note: string | null; metadata: Json; created_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; strategy_id: string; statement: string; source_name: string; platform?: string | null; source_url?: string | null; source_time?: string | null; verification_status?: string; classification?: string; note?: string | null; metadata?: Json; created_by?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; strategy_id?: string; statement?: string; source_name?: string; platform?: string | null; source_url?: string | null; source_time?: string | null; verification_status?: string; classification?: string; note?: string | null; metadata?: Json; created_by?: string | null; created_at?: string; updated_at?: string }
+        Relationships: []
+      },
+      strategi_action_handoffs: {
+        Row: { id: string; strategy_id: string; strategy_version: number | null; target_module: string; tasks: Json; handoff_status: string; created_by: string | null; created_at: string; metadata: Json }
+        Insert: { id?: string; strategy_id: string; strategy_version?: number | null; target_module?: string; tasks?: Json; handoff_status?: string; created_by?: string | null; created_at?: string; metadata?: Json }
+        Update: { id?: string; strategy_id?: string; strategy_version?: number | null; target_module?: string; tasks?: Json; handoff_status?: string; created_by?: string | null; created_at?: string; metadata?: Json }
+        Relationships: []
+      },
+      strategi_archives: {
+        Row: { id: string; strategy_id: string; version_number: number | null; snapshot: Json; archive_reason: string | null; archived_by: string | null; archived_at: string }
+        Insert: { id?: string; strategy_id: string; version_number?: number | null; snapshot: Json; archive_reason?: string | null; archived_by?: string | null; archived_at?: string }
+        Update: { id?: string; strategy_id?: string; version_number?: number | null; snapshot?: Json; archive_reason?: string | null; archived_by?: string | null; archived_at?: string }
+        Relationships: []
+      },
       situasi_system_findings: {
         Row: {
           actor_count: number

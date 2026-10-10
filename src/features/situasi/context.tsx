@@ -3,8 +3,9 @@ import {
   useCallback,
   useContext,
   useMemo,
-  type ReactNode,
+  type React,
 } from "react";
+import type { ReactNode } from "react";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
@@ -25,15 +26,15 @@ type SituationContextValue = {
   addTopic: (topic: NewTopic) => void;
 };
 
-const gs = globalThis as unknown as {
+const globalContext = globalThis as typeof globalThis & {
   __spektraSituationCtx?: React.Context<
     SituationContextValue | undefined
   >;
 };
 
 const SituationContext =
-  gs.__spektraSituationCtx ??
-  (gs.__spektraSituationCtx =
+  globalContext.__spektraSituationCtx ??
+  (globalContext.__spektraSituationCtx =
     createContext<SituationContextValue | undefined>(undefined));
 
 function slugify(value: string): string {
@@ -42,6 +43,15 @@ function slugify(value: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function getTodayIndonesia(): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
 }
 
 export function SituationProvider({
@@ -54,11 +64,11 @@ export function SituationProvider({
     createdTopics: [] as SituationEntry[],
   });
 
-  const monitoredSlugs = Array.isArray(cloud.monitoredSlugs)
+  const monitoredSlugs: string[] = Array.isArray(cloud.monitoredSlugs)
     ? cloud.monitoredSlugs
     : [];
 
-  const createdTopics = Array.isArray(cloud.createdTopics)
+  const createdTopics: SituationEntry[] = Array.isArray(cloud.createdTopics)
     ? cloud.createdTopics
     : [];
 
@@ -82,12 +92,16 @@ export function SituationProvider({
 
   const monitorFinding = useCallback(
     (slug: string) => {
+      if (!slug.trim()) return;
+
       setMonitoredSlugs((current) => {
         const currentSlugs = Array.isArray(current) ? current : [];
 
-        return currentSlugs.includes(slug)
-          ? currentSlugs
-          : [...currentSlugs, slug];
+        if (currentSlugs.includes(slug)) {
+          return currentSlugs;
+        }
+
+        return [...currentSlugs, slug];
       });
     },
     [setMonitoredSlugs],
@@ -95,30 +109,28 @@ export function SituationProvider({
 
   const addTopic = useCallback(
     (topic: NewTopic) => {
+      const name = topic.name.trim();
+
+      if (!name) return;
+
+      const newTopic: SituationEntry = {
+        ...topic,
+        name,
+        slug: `${slugify(name) || "topik"}-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}`,
+        source: "Topik Pantauan",
+        status: "Baru",
+        volume: "0",
+        actors: "0",
+        narratives: "0",
+        since: getTodayIndonesia(),
+        regionScope: "Nasional",
+        createdBy: "Dimas Pratama",
+      };
+
       setCreatedTopics((current) => {
         const currentTopics = Array.isArray(current) ? current : [];
-
-        const baseSlug = slugify(topic.name) || "topik";
-        const slug = `${baseSlug}-${Date.now()}`;
-
-        const newTopic: SituationEntry = {
-          ...topic,
-          slug,
-          source: "Topik Pantauan",
-          status: "Baru",
-          volume: "0",
-          actors: "0",
-          narratives: "0",
-          since: new Date().toLocaleDateString("id-ID", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-            timeZone: "Asia/Jakarta",
-          }),
-          regionScope: "Nasional",
-          createdBy: "Dimas Pratama",
-        };
-
         return [newTopic, ...currentTopics];
       });
     },
@@ -153,4 +165,3 @@ export function useSituations(): SituationContextValue {
 
   return context;
 }
-```

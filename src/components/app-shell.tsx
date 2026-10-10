@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouteContext, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
   Bell,
@@ -220,7 +220,7 @@ function Topbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-10 gap-2 px-2">
               <span className="grid size-7 place-items-center rounded-md bg-secondary"><UserRound className="size-4" /></span>
-              <span className="hidden text-left md:block"><span className="block text-xs font-medium">Dimas Pratama</span><span className="block text-[10px] text-muted-foreground">Pimpinan</span></span>
+              <span className="hidden text-left md:block"><span className="block text-xs font-medium"><SignedInEmail /></span><span className="block text-[10px] text-muted-foreground">Tim SINTESA</span></span>
               <ChevronDown className="hidden size-3.5 text-muted-foreground md:block" />
             </Button>
           </DropdownMenuTrigger>
@@ -259,4 +259,9 @@ function TaskNotifications() {
     {items.map((n) => <Link key={n.id} to="/aksi/kalender-tugas" search={{ task: n.id }} className="block rounded-md px-2 py-1.5 hover:bg-accent/50">
       <p className="text-xs font-semibold">{n.text}</p><p className="text-[11px] text-muted-foreground">{n.title}</p></Link>)}
   </div>;
+}
+
+function SignedInEmail() {
+  const { user } = useRouteContext({ from: "/_authenticated" });
+  return <>{user.email ?? "Pengguna"}</>;
 }

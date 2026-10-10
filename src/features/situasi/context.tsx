@@ -61,9 +61,11 @@ timeZone: "Asia/Jakarta",
 
 Sinkronkan topik ke tabel relasional Supabase.
 
-app_state tetap menjadi penyimpanan utama selama masa transisi.
+app_state tetap digunakan sebagai penyimpanan utama selama transisi.
 */
-async function syncTopicToDatabase(topic: SituationEntry): Promise<void> {
+async function syncTopicToDatabase(
+topic: SituationEntry,
+): Promise<void> {
 const { error } = await supabase
 .from("situasi_topics")
 .upsert(
@@ -89,23 +91,26 @@ updated_at: new Date().toISOString(),
 
 if (error) {
 console.error(
-"[Situasi] Gagal menyinkronkan topik ke situasi_topics:",
+"[Situasi] Gagal menyinkronkan topik:",
 error.message,
 { slug: topic.slug },
 );
-} else {
+return;
+}
+
 console.info(
 "[Situasi] Topik berhasil disinkronkan:",
 topic.slug,
 );
-}
 }
 
 /**
 
 Sinkronkan status pantauan temuan sistem ke Supabase.
 */
-async function syncMonitoringToDatabase(slug: string): Promise<void> {
+async function syncMonitoringToDatabase(
+slug: string,
+): Promise<void> {
 const { error } = await supabase
 .from("situasi_topic_monitoring")
 .upsert(
@@ -118,16 +123,17 @@ monitored_at: new Date().toISOString(),
 
 if (error) {
 console.error(
-"[Situasi] Gagal menyinkronkan pantauan ke situasi_topic_monitoring:",
+"[Situasi] Gagal menyinkronkan pantauan:",
 error.message,
 { slug },
 );
-} else {
+return;
+}
+
 console.info(
 "[Situasi] Pantauan berhasil disinkronkan:",
 slug,
 );
-}
 }
 
 export function SituationProvider({
@@ -140,16 +146,27 @@ monitoredSlugs: [] as string[],
 createdTopics: [] as SituationEntry[],
 });
 
-const monitoredSlugs: string[] = Array.isArray(cloud.monitoredSlugs)
+const monitoredSlugs: string[] = Array.isArray(
+cloud.monitoredSlugs,
+)
 ? cloud.monitoredSlugs
 : [];
 
-const createdTopics: SituationEntry[] = Array.isArray(cloud.createdTopics)
+const createdTopics: SituationEntry[] = Array.isArray(
+cloud.createdTopics,
+)
 ? cloud.createdTopics
 : [];
 
-const setMonitoredSlugs = field(setCloud, "monitoredSlugs");
-const setCreatedTopics = field(setCloud, "createdTopics");
+const setMonitoredSlugs = field(
+setCloud,
+"monitoredSlugs",
+);
+
+const setCreatedTopics = field(
+setCloud,
+"createdTopics",
+);
 
 const topics = useMemo<SituationEntry[]>(() => {
 const monitoredSystemFindings = systemFindings
@@ -169,9 +186,10 @@ return [
 
 const monitorFinding = useCallback(
 (slug: string) => {
-const finding = systemFindings.find((item) => item.slug === slug);
+const finding = systemFindings.find(
+(item) => item.slug === slug,
+);
 
-  // Jangan menyimpan slug yang bukan temuan sistem.
   if (!finding) {
     console.warn(
       "[Situasi] Temuan tidak ditemukan; pantauan dibatalkan:",
@@ -181,7 +199,9 @@ const finding = systemFindings.find((item) => item.slug === slug);
   }
 
   setMonitoredSlugs((current) => {
-    const currentSlugs = Array.isArray(current) ? current : [];
+    const currentSlugs = Array.isArray(current)
+      ? current
+      : [];
 
     if (currentSlugs.includes(slug)) {
       return currentSlugs;
@@ -190,8 +210,7 @@ const finding = systemFindings.find((item) => item.slug === slug);
     return [...currentSlugs, slug];
   });
 
-  // Tetap coba sinkronkan meskipun slug sudah ada di app_state.
-  // Ini juga membantu memperbaiki data relasional yang belum tersimpan.
+  // Coba sinkronkan juga jika slug sudah ada di app_state.
   void syncMonitoringToDatabase(slug);
 },
 [setMonitoredSlugs],
@@ -203,7 +222,9 @@ const addTopic = useCallback(
 const name = topic.name.trim();
 
   if (!name) {
-    console.warn("[Situasi] Nama topik wajib diisi.");
+    console.warn(
+      "[Situasi] Nama topik wajib diisi.",
+    );
     return;
   }
 
@@ -226,13 +247,16 @@ const name = topic.name.trim();
     createdBy: "Dimas Pratama",
   };
 
-  // Simpan melalui mekanisme app_state yang sudah digunakan aplikasi.
+  // Pertahankan penyimpanan app_state yang sudah berjalan.
   setCreatedTopics((current) => {
-    const currentTopics = Array.isArray(current) ? current : [];
+    const currentTopics = Array.isArray(current)
+      ? current
+      : [];
+
     return [newTopic, ...currentTopics];
   });
 
-  // Simpan juga ke tabel relasional tanpa menunggu request selesai.
+  // Sinkronkan ke tabel relasional Supabase.
   void syncTopicToDatabase(newTopic);
 },
 [setCreatedTopics],

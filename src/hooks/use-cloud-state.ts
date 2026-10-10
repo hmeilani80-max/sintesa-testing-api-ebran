@@ -70,7 +70,9 @@ export function useCloudState<T extends object>(key: CloudKey, initial: T) {
             Array.isArray(saved)
           ) {
             throw new Error(
-              `Data Supabase untuk key "${key}" bukan objek JSON yang valid. Autosave diblokir.`
+  "Data Supabase untuk key '" +
+    key +
+    "' bukan objek JSON yang valid. Autosave diblokir."
             );
           }
 

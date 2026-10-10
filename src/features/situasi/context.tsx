@@ -2,7 +2,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useState,
   type Context,
 } from "react";
 import type { ReactNode } from "react";
@@ -140,6 +142,72 @@ export function SituationProvider({
     monitoredSlugs: [] as string[],
     createdTopics: [] as SituationEntry[],
   });
+  const [databaseFindings, setDatabaseFindings] =
+    useState<SituationEntry[]>(systemFindings);
+
+  // Temuan Sistem dibaca dari tabel relasional khusus. Data statis
+  // tetap menjadi fallback agar layar tidak kosong saat database gagal.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSystemFindings() {
+      const { data, error } = await supabase
+        .from("situasi_system_findings")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error(
+          "[Situasi] Gagal memuat Temuan Sistem dari database:",
+          error.message,
+        );
+        return;
+      }
+
+      if (!data?.length) {
+        console.warn(
+          "[Situasi] Tabel situasi_system_findings kosong; memakai data fallback.",
+        );
+        return;
+      }
+
+      const formatCount = (value: number) =>
+        new Intl.NumberFormat("id-ID").format(Number(value) || 0);
+
+      setDatabaseFindings(
+        data.map((row) => ({
+          slug: row.slug,
+          name: row.name,
+          source: "Temuan Sistem" as const,
+          risk: (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah"
+            ? row.risk
+            : undefined),
+          status: row.status,
+          volume: formatCount(row.volume),
+          actors: formatCount(row.actor_count),
+          narratives: formatCount(row.narrative_count),
+          since: row.since_label,
+          description: row.description,
+          platforms: row.platforms ?? [],
+          regionScope: row.region_scope,
+          keywords: row.keywords ?? [],
+          detectedReason: row.detected_reason ?? undefined,
+          triggers: row.triggers ?? [],
+          growth: row.growth ?? undefined,
+          regionsGrowing: row.regions_growing ?? undefined,
+          dominantNarrative: row.dominant_narrative ?? undefined,
+          warningStatus: row.warning_status ?? undefined,
+        })),
+      );
+    }
+
+    void loadSystemFindings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const monitoredSlugs: string[] = Array.isArray(
     cloud.monitoredSlugs,
@@ -164,7 +232,7 @@ export function SituationProvider({
   );
 
   const topics = useMemo<SituationEntry[]>(() => {
-    const monitoredSystemFindings = systemFindings
+    const monitoredSystemFindings = databaseFindings
       .filter((item) => monitoredSlugs.includes(item.slug))
       .map((item) => ({
         ...item,
@@ -176,11 +244,11 @@ export function SituationProvider({
       ...monitoredSystemFindings,
       ...createdTopics,
     ];
-  }, [monitoredSlugs, createdTopics]);
+  }, [monitoredSlugs, createdTopics, databaseFindings]);
 
   const monitorFinding = useCallback(
     (slug: string) => {
-      const finding = systemFindings.find(
+      const finding = databaseFindings.find(
         (item) => item.slug === slug,
       );
 
@@ -207,7 +275,7 @@ export function SituationProvider({
       // Sinkronkan status pantauan ke tabel relasional.
       void syncMonitoringToDatabase(slug);
     },
-    [setMonitoredSlugs],
+    [setMonitoredSlugs, databaseFindings],
   );
 
   const addTopic = useCallback(
@@ -257,12 +325,12 @@ export function SituationProvider({
 
   const value = useMemo<SituationContextValue>(
     () => ({
-      findings: systemFindings,
+      findings: databaseFindings,
       topics,
       monitorFinding,
       addTopic,
     }),
-    [topics, monitorFinding, addTopic],
+    [databaseFindings, topics, monitorFinding, addTopic],
   );
 
   return (

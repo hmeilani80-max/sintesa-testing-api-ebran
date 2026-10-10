@@ -1,4 +1,3 @@
-```tsx
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -13,13 +12,13 @@ function cloneJson<T>(value: T): T {
 }
 
 /**
- * Menyinkronkan state dengan tabel public.app_state.
+ * Menyinkronkan state dengan public.app_state.
  *
  * Perlindungan:
- * - Tidak melakukan autosave selama data sedang dimuat.
- * - Tidak melakukan autosave jika pembacaan Supabase gagal.
- * - Seed hanya digunakan jika query berhasil dan baris belum ada.
- * - Error pemuatan dan penyimpanan dicatat dengan jelas.
+ * - Autosave diblokir selama data sedang dimuat.
+ * - Autosave diblokir jika pembacaan Supabase gagal.
+ * - Seed hanya digunakan jika query berhasil dan baris tidak ditemukan.
+ * - Error baca dan tulis dicatat ke console.
  */
 export function useCloudState<T extends object>(
   key: CloudKey,
@@ -29,9 +28,12 @@ export function useCloudState<T extends object>(
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
 
   const loadedKey = useRef<CloudKey | null>(null);
+  const loadRequest = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const requestId = loadRequest.current + 1;
+    loadRequest.current = requestId;
 
     loadedKey.current = null;
     setLoadStatus("loading");
@@ -44,15 +46,17 @@ export function useCloudState<T extends object>(
           .eq("key", key)
           .maybeSingle();
 
-        if (cancelled) return;
+        if (cancelled || loadRequest.current !== requestId) {
+          return;
+        }
 
         if (result.error) {
           throw result.error;
         }
 
         if (result.data === null) {
-          // Query berhasil dan baris memang belum ada.
-          // Hanya kondisi ini yang mengizinkan penggunaan seed.
+          // Query berhasil dan baris memang tidak ditemukan.
+          // Hanya dalam kondisi ini seed digunakan.
           setState(cloneJson(initial));
         } else {
           const saved = result.data.data;
@@ -65,12 +69,12 @@ export function useCloudState<T extends object>(
             throw new Error(
               "Data Supabase untuk key '" +
                 key +
-                "' bukan objek JSON yang valid. Autosave diblokir."
+                "' bukan objek JSON yang valid."
             );
           }
 
-          // Data server diprioritaskan. Seed hanya melengkapi
-          // field tingkat atas yang belum tersedia.
+          // Data server menjadi sumber utama.
+          // Seed hanya melengkapi field tingkat atas yang belum ada.
           const merged = {
             ...cloneJson(initial),
             ...(saved as Partial<T>),
@@ -82,7 +86,9 @@ export function useCloudState<T extends object>(
         loadedKey.current = key;
         setLoadStatus("ready");
       } catch (error) {
-        if (cancelled) return;
+        if (cancelled || loadRequest.current !== requestId) {
+          return;
+        }
 
         loadedKey.current = null;
         setLoadStatus("error");
@@ -104,8 +110,10 @@ export function useCloudState<T extends object>(
   }, [key]);
 
   useEffect(() => {
-    // Jangan menyimpan seed ketika loading atau terjadi error.
-    if (loadStatus !== "ready" || loadedKey.current !== key) {
+    if (
+      loadStatus !== "ready" ||
+      loadedKey.current !== key
+    ) {
       return;
     }
 
@@ -115,15 +123,24 @@ export function useCloudState<T extends object>(
       try {
         const result = await supabase
           .from("app_state")
-          .upsert({
-            key: key,
-            data: snapshot,
-            updated_at: new Date().toISOString(),
-          });
+          .upsert(
+            {
+              key: key,
+              data: snapshot,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "key" }
+          );
 
         if (result.error) {
           throw result.error;
         }
+
+        console.info(
+          "[useCloudState] Data berhasil disimpan untuk key '" +
+            key +
+            "'."
+        );
       } catch (error) {
         console.error(
           "[useCloudState] Gagal menyimpan key '" +
@@ -143,12 +160,11 @@ export function useCloudState<T extends object>(
     React.Dispatch<React.SetStateAction<T>>
   >(
     (value) => {
-      // Tolak perubahan sampai data untuk key aktif berhasil dimuat.
       if (loadedKey.current !== key) {
         console.warn(
           "[useCloudState] Perubahan untuk '" +
             key +
-            "' ditahan karena data belum berhasil dimuat."
+            "' ditolak karena data belum berhasil dimuat."
         );
         return;
       }
@@ -175,4 +191,3 @@ export function field<T extends object, K extends keyof T>(
           : v,
     }));
 }
-```

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
@@ -51,14 +51,12 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     log: [{ at: "10:05", text: "Publikasi Artikel Demonstrasi diajukan oleh Tim Media" }] as LogEntry[],
   });
   const { productions, campaigns, orders, accounts, log } = cloud;
-  const hydratedFromDatabase = useRef(false);
-  const loadingDatabase = useRef(false);
+  const [databaseReady, setDatabaseReady] = useState(false);
 
   // Relational Produksi becomes the operational source after loading succeeds.
   // Keep app_state/useCloudState intact as a compatibility fallback during rollout.
   useEffect(() => {
     let cancelled = false;
-    loadingDatabase.current = true;
     void (async () => {
       try {
         const { data, error } = await supabase
@@ -77,8 +75,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         console.error("[Produksi] Gagal memuat database relasional; memakai app_state sementara.", error);
       } finally {
         if (!cancelled) {
-          loadingDatabase.current = false;
-          hydratedFromDatabase.current = true;
+          setDatabaseReady(true);
         }
       }
     })();
@@ -86,7 +83,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   }, [setCloud]);
 
   useEffect(() => {
-    if (!hydratedFromDatabase.current || loadingDatabase.current) return;
+    if (!databaseReady) return;
     let cancelled = false;
     void (async () => {
       for (const item of productions) {
@@ -146,7 +143,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [productions]);
+  }, [productions, databaseReady]);
 
   const setProductions = field(setCloud, "productions");
   const setCampaigns = field(setCloud, "campaigns");

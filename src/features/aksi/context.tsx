@@ -5,7 +5,7 @@ import { saveProductionItem } from "./production.functions";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
-  applyDecision, applySubmit, buildItems, canSubmit, invalidateApproval, generateContent, initialOrders, initialProductions,
+  applyDecision, applySubmit, buildItems, canSubmit, invalidateApproval, initialOrders, initialProductions,
   type ApprovalStatus, type Campaign, type ChannelOrder, type HistoryEntry, type NewsOrder, type NewsStatus, type OutputType, type ProductionBrief, type ProductionContent, type ProductionItem,
 } from "./data";
 import { advanceExecution, executionDone, initialCampaigns, regeneratePost, retry, SOCIAL_ACCOUNTS, statusAfterDecision, type AccountRole, type AccountStatus, type Post, type SocialAccount } from "./sosial";
@@ -45,7 +45,6 @@ const g = globalThis as unknown as { __spektraAksiCtx?: React.Context<Value | un
 const Ctx = g.__spektraAksiCtx ?? (g.__spektraAksiCtx = createContext<Value | undefined>(undefined));
 
 const now = () => new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-const GENERATION_MS = 1400;
 
 export function AksiProvider({ children }: { children: ReactNode }) {
   const [cloud, setCloud] = useCloudState("aksi", {

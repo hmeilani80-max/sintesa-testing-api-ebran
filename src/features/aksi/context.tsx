@@ -118,14 +118,25 @@ export function AksiProvider({ children }: { children: ReactNode }) {
           continue;
         }
         if (item.version > 0) {
-          const { error: versionError } = await supabase.from("production_item_versions").upsert({
-            production_id: item.id,
-            version_number: item.version,
-            snapshot,
-            change_label: item.history[item.history.length - 1]?.label ?? "Snapshot",
-            created_by: item.submittedBy ?? null,
-          }, { onConflict: "production_id,version_number" });
-          if (versionError) console.error("[Produksi] Gagal menyimpan versi", item.id, versionError);
+          // Keep version snapshots immutable: never overwrite an existing version.
+          const { data: existingVersion, error: lookupVersionError } = await supabase
+            .from("production_item_versions")
+            .select("id")
+            .eq("production_id", item.id)
+            .eq("version_number", item.version)
+            .maybeSingle();
+          if (lookupVersionError) {
+            console.error("[Produksi] Gagal memeriksa versi", item.id, lookupVersionError);
+          } else if (!existingVersion) {
+            const { error: versionError } = await supabase.from("production_item_versions").insert({
+              production_id: item.id,
+              version_number: item.version,
+              snapshot,
+              change_label: item.history[item.history.length - 1]?.label ?? "Snapshot",
+              created_by: item.submittedBy ?? null,
+            });
+            if (versionError) console.error("[Produksi] Gagal menyimpan versi", item.id, versionError);
+          }
         }
         for (const [index, event] of (item.approvals ?? []).entries()) {
           const eventKey = item.id + ":" + index + ":" + event.decision + ":" + event.at;

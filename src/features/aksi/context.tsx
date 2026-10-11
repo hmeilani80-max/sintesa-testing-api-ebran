@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
@@ -50,6 +51,103 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     log: [{ at: "10:05", text: "Publikasi Artikel Demonstrasi diajukan oleh Tim Media" }] as LogEntry[],
   });
   const { productions, campaigns, orders, accounts, log } = cloud;
+  const hydratedFromDatabase = useRef(false);
+  const loadingDatabase = useRef(false);
+
+  // Relational Produksi becomes the operational source after loading succeeds.
+  // Keep app_state/useCloudState intact as a compatibility fallback during rollout.
+  useEffect(() => {
+    let cancelled = false;
+    loadingDatabase.current = true;
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("production_items")
+          .select("id,snapshot,updated_at")
+          .order("updated_at", { ascending: false });
+        if (error) throw error;
+        if (cancelled) return;
+        if (data?.length) {
+          const restored = data
+            .map((row) => row.snapshot as unknown as ProductionItem)
+            .filter((item) => item && typeof item.id === "string" && typeof item.title === "string");
+          if (restored.length) setCloud((current) => ({ ...current, productions: restored }));
+        }
+      } catch (error) {
+        console.error("[Produksi] Gagal memuat database relasional; memakai app_state sementara.", error);
+      } finally {
+        if (!cancelled) {
+          loadingDatabase.current = false;
+          hydratedFromDatabase.current = true;
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [setCloud]);
+
+  useEffect(() => {
+    if (!hydratedFromDatabase.current || loadingDatabase.current) return;
+    let cancelled = false;
+    void (async () => {
+      for (const item of productions) {
+        if (cancelled) return;
+        const snapshot = item as unknown as import("@/integrations/supabase/types").Json;
+        const { error } = await supabase.from("production_items").upsert({
+          id: item.id,
+          title: item.title,
+          output_type: item.type,
+          output_family: item.family,
+          destinations: item.dest as unknown as import("@/integrations/supabase/types").Json,
+          source: item.source,
+          strategy_slug: item.strategySlug ?? null,
+          strategy_title: item.strategyTitle ?? null,
+          situation_slug: item.situationSlug ?? null,
+          situation_name: item.situationName ?? null,
+          production_status: item.status,
+          approval_status: item.approval,
+          active_version: item.version,
+          variant: item.variant,
+          brief: item.brief as unknown as import("@/integrations/supabase/types").Json,
+          content: item.content as unknown as import("@/integrations/supabase/types").Json,
+          review_note: item.reviewNote ?? null,
+          submitted_by: item.submittedBy ?? null,
+          submitted_at: item.submittedAt ?? null,
+          submitted_day: item.submittedDay ?? null,
+          snapshot,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" });
+        if (error) {
+          console.error("[Produksi] Gagal menyimpan item", item.id, error);
+          continue;
+        }
+        if (item.version > 0) {
+          const { error: versionError } = await supabase.from("production_item_versions").upsert({
+            production_id: item.id,
+            version_number: item.version,
+            snapshot,
+            change_label: item.history[item.history.length - 1]?.label ?? "Snapshot",
+            created_by: item.submittedBy ?? null,
+          }, { onConflict: "production_id,version_number" });
+          if (versionError) console.error("[Produksi] Gagal menyimpan versi", item.id, versionError);
+        }
+        for (const [index, event] of (item.approvals ?? []).entries()) {
+          const eventKey = item.id + ":" + index + ":" + event.decision + ":" + event.at;
+          const { error: eventError } = await supabase.from("production_approval_events").upsert({
+            production_id: item.id,
+            version_number: event.version ?? null,
+            decision: event.decision,
+            actor: event.actor,
+            note: event.note ?? null,
+            occurred_at: event.at,
+            event_key: eventKey,
+          }, { onConflict: "event_key" });
+          if (eventError) console.error("[Produksi] Gagal menyimpan event approval", item.id, eventError);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [productions]);
+
   const setProductions = field(setCloud, "productions");
   const setCampaigns = field(setCloud, "campaigns");
   const setOrders = field(setCloud, "orders");

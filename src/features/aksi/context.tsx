@@ -194,7 +194,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         return items.map((i) => i.id);
       },
       generate: (id, settings) => { if (settings) patch(id, (p) => ({ ...p, content: { ...p.content, ...settings } })); runGeneration(id, settings); },
-      saveContent: (id, content) => patch(id, (p) => ({ ...p, content, version: p.version + 1, history: hist(p, "Edited", p.version + 1) })),
+      saveContent: (id, content) => patch(id, (p) => { const at = now(); const nextVersion = p.version + 1; return { ...invalidateApproval(p, at, p.version, nextVersion), content, version: nextVersion, history: hist(p, "Edited", nextVersion) }; }),
       submit: (id) => {
         const p = productions.find((x) => x.id === id);
         if (!p || !canSubmit(p)) return;

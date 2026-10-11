@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { generateProductionContent } from "./ai-writer.functions";
+import { saveProductionItem } from "./production.functions";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
@@ -166,14 +168,33 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   const editCampaign = (id: string, fn: (c: Campaign) => Campaign) => setCampaigns((cur) => cur.map((c) => (c.id === id ? fn(c) : c)));
   const hist = (p: ProductionItem, label: HistoryEntry["label"], version = p.version): HistoryEntry[] => [...p.history, { version, label, at: now() }];
 
-  const runGeneration = (id: string, settings?: Partial<ProductionContent>) => {
+  const runGeneration = async (id: string, settings?: Partial<ProductionContent>, suppliedItem?: ProductionItem) => {
+    const current = suppliedItem ?? productions.find((item) => item.id === id);
+    if (!current) return;
     patch(id, (p) => ({ ...p, status: "Generating" }));
-    setTimeout(() => patch(id, (p) => {
-      const variant = p.version === 0 ? 0 : p.variant + 1;
-      const version = p.version + 1;
-      const keep = { duration: p.content.duration, format: p.content.format, voiceOver: p.content.voiceOver, voice: p.content.voice, ...settings };
-      return { ...invalidateApproval(p, now(), p.version, version), status: "Generated", variant, version, content: generateContent(p.type, p.brief, variant, keep), history: hist(p, p.version === 0 ? "Generated" : "Regenerated", version) };
-    }), GENERATION_MS);
+    try {
+      // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
+      const aiContent = await generateProductionContent({ data: { type: current.type, brief: current.brief } });
+      const variant = current.version === 0 ? 0 : current.variant + 1;
+      const version = current.version + 1;
+      const content: ProductionContent = { ...aiContent, ...settings };
+      const next: ProductionItem = {
+        ...invalidateApproval(current, now(), current.version, version),
+        status: "Generated", approval: current.approval === "Disetujui" ? null : current.approval,
+        variant, version, content,
+        history: [...current.history, { version, label: current.version === 0 ? "Generated" : "Regenerated", at: now() }],
+        updated: "Baru saja",
+      };
+      // Persist before presenting the item as successfully generated.
+      await saveProductionItem({ data: next });
+      setProductions((items) => items.map((item) => item.id === id ? next : item));
+      audit(`${next.title} v${version} berhasil dibuat oleh Gemini AI`);
+    } catch (error) {
+      console.error("[Produksi] AI generation/persistence failed", error);
+      patch(id, (p) => ({ ...p, status: "Draft" }));
+      audit(`Generate ${current.title} gagal; konten tidak ditandai Generated. Periksa konfigurasi AI atau koneksi database.`);
+      throw error;
+    }
   };
 
   const value = useMemo<Value>(() => {
@@ -190,10 +211,10 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         const items = buildItems(brief, types, origin, 21 + productions.length);
         setProductions((cur) => [...items, ...cur]);
         audit(`${items.length} item Produksi dibuat dari ${origin.source === "Strategi" ? `Strategi “${origin.strategyTitle}”` : "brief manual"}`);
-        for (const it of items) runGeneration(it.id);
+        for (const it of items) void runGeneration(it.id, undefined, it).catch(() => undefined);
         return items.map((i) => i.id);
       },
-      generate: (id, settings) => { if (settings) patch(id, (p) => ({ ...p, content: { ...p.content, ...settings } })); runGeneration(id, settings); },
+      generate: (id, settings) => { void runGeneration(id, settings).catch(() => undefined); },
       saveContent: (id, content) => patch(id, (p) => { const at = now(); const nextVersion = p.version + 1; return { ...invalidateApproval(p, at, p.version, nextVersion), content, version: nextVersion, history: hist(p, "Edited", nextVersion) }; }),
       submit: (id) => {
         const p = productions.find((x) => x.id === id);

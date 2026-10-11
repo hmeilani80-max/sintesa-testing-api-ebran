@@ -32,6 +32,24 @@ export type Database = {
         }
         Relationships: []
       },
+      production_items: {
+        Row: { id: string; title: string; output_type: string; output_family: string; destinations: Json; source: string; strategy_slug: string | null; strategy_title: string | null; situation_slug: string | null; situation_name: string | null; production_status: string; approval_status: string | null; active_version: number; variant: number; brief: Json; content: Json; review_note: string | null; submitted_by: string | null; submitted_at: string | null; submitted_day: string | null; snapshot: Json; created_at: string; updated_at: string }
+        Insert: { id: string; title?: string; output_type?: string; output_family?: string; destinations?: Json; source?: string; strategy_slug?: string | null; strategy_title?: string | null; situation_slug?: string | null; situation_name?: string | null; production_status?: string; approval_status?: string | null; active_version?: number; variant?: number; brief?: Json; content?: Json; review_note?: string | null; submitted_by?: string | null; submitted_at?: string | null; submitted_day?: string | null; snapshot?: Json; created_at?: string; updated_at?: string }
+        Update: { id?: string; title?: string; output_type?: string; output_family?: string; destinations?: Json; source?: string; strategy_slug?: string | null; strategy_title?: string | null; situation_slug?: string | null; situation_name?: string | null; production_status?: string; approval_status?: string | null; active_version?: number; variant?: number; brief?: Json; content?: Json; review_note?: string | null; submitted_by?: string | null; submitted_at?: string | null; submitted_day?: string | null; snapshot?: Json; created_at?: string; updated_at?: string }
+        Relationships: []
+      },
+      production_item_versions: {
+        Row: { id: string; production_id: string; version_number: number; snapshot: Json; change_label: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; production_id: string; version_number: number; snapshot: Json; change_label?: string; created_by?: string | null; created_at?: string }
+        Update: { id?: string; production_id?: string; version_number?: number; snapshot?: Json; change_label?: string; created_by?: string | null; created_at?: string }
+        Relationships: []
+      },
+      production_approval_events: {
+        Row: { id: string; production_id: string; version_number: number | null; decision: string; actor: string; note: string | null; occurred_at: string | null; created_at: string; event_key: string | null }
+        Insert: { id?: string; production_id: string; version_number?: number | null; decision: string; actor?: string; note?: string | null; occurred_at?: string | null; created_at?: string; event_key?: string | null }
+        Update: { id?: string; production_id?: string; version_number?: number | null; decision?: string; actor?: string; note?: string | null; occurred_at?: string | null; created_at?: string; event_key?: string | null }
+        Relationships: []
+      },
       strategi_strategies: {
         Row: { id: string; slug: string; title: string; source: string; situation_slug: string | null; situation_name: string | null; status: string; objective: string; context: string | null; audience: string | null; region: string | null; platforms: Json; approach: string | null; metadata: Json; created_by: string | null; updated_by: string | null; created_at: string; updated_at: string; archived_at: string | null }
         Insert: { id?: string; slug: string; title: string; source: string; situation_slug?: string | null; situation_name?: string | null; status?: string; objective?: string; context?: string | null; audience?: string | null; region?: string | null; platforms?: Json; approach?: string | null; metadata?: Json; created_by?: string | null; updated_by?: string | null; created_at?: string; updated_at?: string; archived_at?: string | null }

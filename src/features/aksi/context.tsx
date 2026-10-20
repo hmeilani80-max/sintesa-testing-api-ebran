@@ -182,64 +182,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
 
   const { productions, campaigns, orders, accounts, log } = cloud;
 
-  // Tracks the result of the relational database read.
-  // This flag does not trigger writes to Supabase.
-  const [databaseLoadStatus, setDatabaseLoadStatus] = useState<
-    "loading" | "loaded" | "error"
-  >("loading");
-
-  // Load relational Produksi records only.
-  // Never upsert the entire frontend state during initialization.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProductions() {
-      try {
-        const { data, error } = await supabase
-          .from("production_items")
-          .select("id,snapshot,updated_at")
-          .order("updated_at", { ascending: false });
-
-        if (error) throw error;
-        if (cancelled) return;
-
-        const restored = (data ?? [])
-          .map((row) => row.snapshot as unknown as ProductionItem)
-          .filter(
-            (item) =>
-              item &&
-              typeof item.id === "string" &&
-              typeof item.title === "string",
-          );
-
-        // An empty database must remain empty.
-        // Do not replace it with demo productions.
-        setCloud((current) => ({
-          ...current,
-          productions: restored,
-        }));
-
-        setDatabaseLoadStatus("loaded");
-      } catch (error) {
-        if (cancelled) return;
-
-        console.error(
-          "[Produksi] Gagal memuat database relasional.",
-          error,
-        );
-
-        // Do not write fallback/demo data to the relational database.
-        setDatabaseLoadStatus("error");
-      }
-    }
-
-    void loadProductions();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [setCloud]);
-
   const setProductions = field(setCloud, "productions");
   const setCampaigns = field(setCloud, "campaigns");
   const setOrders = field(setCloud, "orders");
@@ -283,18 +225,113 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   const runGeneration = (
     id: string,
     settings?: Partial<ProductionContent>,
+    sourceItem?: ProductionItem,
   ) => {
+    const target = sourceItem ?? productions.find((item) => item.id === id);
+    if (!target) return;
+
     patch(id, (production) => ({
       ...production,
+      generationError: undefined,
       status: "Generating",
     }));
 
+    if (target.type === "Infografis") {
+      void (async () => {
+        try {
+          const { data: sessionData, error: sessionError } =
+            await supabase.auth.getSession();
+          if (sessionError) throw sessionError;
+          const accessToken = sessionData.session?.access_token;
+          if (!accessToken) {
+            throw new Error("Sesi login tidak tersedia. Silakan login ulang.");
+          }
+
+          const prompt = [
+            "Buat satu gambar infografis berbahasa Indonesia untuk kanal informasi publik SINTESA.",
+            "Gaya: editorial profesional, bersih, data-driven, kontras tinggi, tipografi mudah dibaca, layout hierarkis, tanpa logo atau watermark palsu.",
+            "Tema: " + target.brief.theme,
+            "Pesan utama: " + target.brief.message,
+            "Fakta dan poin pendukung: " + target.brief.points.filter(Boolean).join("; "),
+            "Arahan gaya: " + target.brief.style.join(", "),
+            "Audiens: " + (target.brief.audience ?? "masyarakat umum"),
+            "Wilayah: " + (target.brief.region ?? "Indonesia"),
+            "Jangan mengarang angka, nama, kutipan, atau fakta yang tidak ada pada brief. Gunakan teks singkat dan komposisi visual yang jelas.",
+          ].join("\n");
+
+          const created = await fetch("/api/luma-infografis", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: "Bearer " + accessToken,
+            },
+            body: JSON.stringify({ prompt, aspectRatio: "3:4" }),
+          });
+          const createdBody = (await created.json()) as { id?: string; error?: string };
+          if (!created.ok || !createdBody.id) {
+            throw new Error(createdBody.error ?? "Luma gagal memulai generasi gambar.");
+          }
+
+          let completedImage: string | undefined;
+          for (let attempt = 0; attempt < 45; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const response = await fetch(
+              "/api/luma-infografis?id=" + encodeURIComponent(createdBody.id),
+              { headers: { authorization: "Bearer " + accessToken } },
+            );
+            const body = (await response.json()) as {
+              state?: string;
+              imageUrl?: string;
+              error?: string;
+              failureReason?: string;
+            };
+            if (!response.ok) throw new Error(body.error ?? "Gagal memeriksa status generasi Luma.");
+            if (body.state === "completed" && body.imageUrl) {
+              completedImage = body.imageUrl;
+              break;
+            }
+            if (body.state === "failed") {
+              throw new Error(body.failureReason ?? "Generasi gambar Luma gagal.");
+            }
+          }
+          if (!completedImage) {
+            throw new Error("Generasi Luma belum selesai setelah 90 detik. Coba regenerate.");
+          }
+
+          patch(id, (production) => {
+            const variant = production.version === 0 ? 0 : production.variant + 1;
+            const version = production.version + 1;
+            const keep = {
+              duration: production.content.duration,
+              format: production.content.format,
+              voiceOver: production.content.voiceOver,
+              voice: production.content.voice,
+              ...settings,
+            };
+            const generated = generateContent(production.type, production.brief, variant, keep);
+            return {
+              ...invalidateApproval(production, now(), production.version, version),
+              status: "Generated",
+              generationError: undefined,
+              variant,
+              version,
+              content: { ...generated, imageUrl: completedImage },
+              history: hist(production, production.version === 0 ? "Generated" : "Regenerated", version),
+            };
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Generasi infografis gagal.";
+          patch(id, (production) => ({ ...production, status: "Draft", generationError: message }));
+          audit("Generasi Luma gagal untuk " + target.title + ": " + message);
+        }
+      })();
+      return;
+    }
+
     setTimeout(() => {
       patch(id, (production) => {
-        const variant =
-          production.version === 0 ? 0 : production.variant + 1;
+        const variant = production.version === 0 ? 0 : production.variant + 1;
         const version = production.version + 1;
-
         const keep = {
           duration: production.content.duration,
           format: production.content.format,
@@ -302,28 +339,13 @@ export function AksiProvider({ children }: { children: ReactNode }) {
           voice: production.content.voice,
           ...settings,
         };
-
         return {
-          ...invalidateApproval(
-            production,
-            now(),
-            production.version,
-            version,
-          ),
+          ...invalidateApproval(production, now(), production.version, version),
           status: "Generated",
           variant,
           version,
-          content: generateContent(
-            production.type,
-            production.brief,
-            variant,
-            keep,
-          ),
-          history: hist(
-            production,
-            production.version === 0 ? "Generated" : "Regenerated",
-            version,
-          ),
+          content: generateContent(production.type, production.brief, variant, keep),
+          history: hist(production, production.version === 0 ? "Generated" : "Regenerated", version),
         };
       });
     }, GENERATION_MS);
@@ -405,13 +427,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       accounts,
 
       createProductions: (brief, types, origin) => {
-        if (databaseLoadStatus !== "loaded") {
-          console.error(
-            "[Produksi] Pembuatan item diblokir karena status database belum siap.",
-          );
-          return [];
-        }
-
         const items = buildItems(brief, types, origin, 21 + productions.length);
 
         setProductions((current) => [...items, ...current]);
@@ -424,14 +439,12 @@ export function AksiProvider({ children }: { children: ReactNode }) {
           }`,
         );
 
-        for (const item of items) runGeneration(item.id);
+        for (const item of items) runGeneration(item.id, undefined, item);
 
         return items.map((item) => item.id);
       },
 
       generate: (id, settings) => {
-        if (databaseLoadStatus !== "loaded") return;
-
         if (settings) {
           patch(id, (production) => ({
             ...production,
@@ -443,8 +456,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       saveContent: (id, content) => {
-        if (databaseLoadStatus !== "loaded") return;
-
         patch(id, (production) => {
           const at = now();
           const nextVersion = production.version + 1;
@@ -464,8 +475,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       submit: (id) => {
-        if (databaseLoadStatus !== "loaded") return;
-
         const production = productions.find((item) => item.id === id);
         if (!production || !canSubmit(production)) return;
 
@@ -489,8 +498,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       decide: (ref, decision, note) => {
-        if (ref.kind === "Konten" && databaseLoadStatus !== "loaded") return;
-
         const at = now();
 
         if (ref.kind === "Konten") {
@@ -879,7 +886,6 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     orders,
     log,
     accounts,
-    databaseLoadStatus,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

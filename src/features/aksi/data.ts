@@ -23,6 +23,7 @@ export function outputMeta(type: OutputType) {
 export type ProductionBrief = { theme: string; message: string; points: string[]; style: string[]; audience?: string | undefined; region?: string | undefined; channels?: string[] | undefined };
 export type ProductionContent = {
   headline: string; subtitle: string; lead: string; body: string; tags: string[];
+  imageUrl?: string | undefined;
   slides: { label: string; text: string }[]; highlights: { value: string; label: string }[]; caption: string;
   duration: number; format: "9:16" | "16:9"; voiceOver: boolean; voice: string; transcript: string;
 };

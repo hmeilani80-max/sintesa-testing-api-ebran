@@ -32,7 +32,7 @@ export type ProductionItem = {
   id: string; title: string; type: OutputType; family: OutputFamily; dest: Destination[];
   source: "Strategi" | "Manual"; strategySlug?: string | undefined; strategyTitle?: string | undefined; situationSlug?: string | undefined; situationName?: string | undefined;
   brief: ProductionBrief; status: ProductionStatus; approval: ApprovalStatus | null; version: number; variant: number;
-  content: ProductionContent; history: HistoryEntry[]; reviewNote?: string | undefined; updated: string;
+  content: ProductionContent; history: HistoryEntry[]; reviewNote?: string | undefined; generationError?: string | undefined; updated: string;
   approvals: ApprovalRecord[]; submittedBy?: string | undefined; submittedAt?: string | undefined; submittedDay?: SubmittedDay | undefined;
 };
 

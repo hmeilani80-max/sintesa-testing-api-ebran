@@ -25,3 +25,6 @@
 - [x] Revisi Dampak tanpa redesign: label, timeline, tautan respons, drilldown narasi, dan jenis laporan; verifikasi alur
 - [x] Arsip & Pengetahuan: pencarian isi, repository, detail (provenance, versi, audit, akses, retention), upload, kepatuhan
 - [x] Branding SINTESA dan warna merek #B33A50 terbatas
+- [ ] Siapkan AI Luma untuk Buat Produksi tipe Infografis
+- [ ] Verifikasi pembuatan, penyimpanan, dan preview Infografis (memerlukan API Luma)
+- [ ] Perbaiki kendala pemeriksaan aplikasi yang sudah ada

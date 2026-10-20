@@ -60,7 +60,6 @@ async function lumaRequest(path: string, init?: RequestInit) {
         accept: "application/json",
         authorization: "Bearer " + apiKey,
         ...(init?.body ? { "content-type": "application/json" } : {}),
-        ...init?.headers,
       },
     });
     return { response, error: null };

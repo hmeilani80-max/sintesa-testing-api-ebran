@@ -167,7 +167,7 @@ const now = () =>
 const GENERATION_MS = 1400;
 
 export function AksiProvider({ children }: { children: ReactNode }) {
-  const [cloud, setCloud] = useCloudState("aksi", {
+  const [cloud, setCloud, cloudStatus] = useCloudState("aksi", {
     productions: initialProductions,
     campaigns: initialCampaigns,
     orders: initialOrders,
@@ -427,6 +427,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       accounts,
 
       createProductions: (brief, types, origin) => {
+        if (cloudStatus.load !== "ready") return [];
         const items = buildItems(brief, types, origin, 21 + productions.length);
 
         setProductions((current) => [...items, ...current]);
@@ -445,6 +446,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       generate: (id, settings) => {
+        if (cloudStatus.load !== "ready") return;
         if (settings) {
           patch(id, (production) => ({
             ...production,
@@ -456,6 +458,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       saveContent: (id, content) => {
+        if (cloudStatus.load !== "ready") return;
         patch(id, (production) => {
           const at = now();
           const nextVersion = production.version + 1;
@@ -475,6 +478,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       submit: (id) => {
+        if (cloudStatus.load !== "ready") return;
         const production = productions.find((item) => item.id === id);
         if (!production || !canSubmit(production)) return;
 
@@ -498,6 +502,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       decide: (ref, decision, note) => {
+        if (cloudStatus.load !== "ready") return;
         const at = now();
 
         if (ref.kind === "Konten") {
@@ -886,6 +891,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     orders,
     log,
     accounts,
+    cloudStatus.load,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -18,6 +18,7 @@ import { getAiProviderStatus, verifyAiProvider } from "@/features/aksi/ai-model-
 import { useStrategies } from "@/features/strategi/context";
 import type { Strategy } from "@/features/strategi/data";
 import { cn } from "@/lib/utils";
+import { PromptManagerDialog } from "@/features/aksi/PromptManagerDialog";
 
 export const Route = createFileRoute("/_authenticated/aksi/produksi/")({
   head: aksiHead("Produksi", "Kelola pembuatan konten berbasis strategi dan brief, dari generation hingga siap diajukan untuk persetujuan."),
@@ -50,6 +51,7 @@ function Produksi() {
     News: "gemini-2.5-flash", Visual: "visual-current", Video: "gemini-2.5-flash", Audio: "gemini-2.5-flash",
   });
   const [modelDialog, setModelDialog] = useState(false);
+  const [promptManagerOpen, setPromptManagerOpen] = useState(false);
   const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
   const [provider, setProvider] = useState("Gemini");
   const [providerModel, setProviderModel] = useState("gemini-2.5-flash");
@@ -128,6 +130,7 @@ function Produksi() {
 
           {step === 3 && <div className="grid gap-3">
             <p className="text-xs text-muted-foreground">Pilih satu atau beberapa output. Setiap output menjadi item Produksi terpisah dengan approval masing-masing.</p>
+            <div className="flex justify-end"><Button type="button" variant="outline" size="sm" onClick={() => setPromptManagerOpen(true)}>Kelola Prompt AI</Button></div>
             <div className="grid gap-3 sm:grid-cols-2">{(["News", "Visual", "Video", "Audio"] as const).map((f) => (
               <fieldset key={f} className="rounded-md border border-border p-3"><legend className="px-1 text-[11px] font-semibold uppercase text-muted-foreground">{f}</legend>
                 {OUTPUT_TYPES.filter((o) => o.family === f).map((o) => <label key={o.type} className="flex items-center gap-2 py-1 text-sm"><Checkbox checked={types.includes(o.type)} onCheckedChange={() => setTypes((cur) => (cur.includes(o.type) ? cur.filter((x) => x !== o.type) : [...cur, o.type]))} />{o.type}</label>)}
@@ -153,6 +156,7 @@ function Produksi() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PromptManagerDialog open={promptManagerOpen} onOpenChange={setPromptManagerOpen} />
       <Dialog open={modelDialog} onOpenChange={setModelDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Tambahkan Model AI · {modelFamily}</DialogTitle></DialogHeader>

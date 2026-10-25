@@ -1,3 +1,5 @@
+import { buildLumaInfographicPrompt } from "./prompt-templates";
+import { getWorkspacePrompt } from "./prompt-store.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -19,23 +21,7 @@ const generationSchema = z.object({
   assets: z.object({ image: z.string().url().nullable().optional() }).optional(),
 }).passthrough();
 
-function buildInfographicPrompt(input: z.infer<typeof inputSchema>) {
-  const facts = input.points.length
-    ? input.points.map((point, index) => `${index + 1}. ${point}`).join("\n")
-    : "Jangan menambahkan angka atau fakta spesifik; gunakan ilustrasi konseptual.";
-  return [
-    "Create a polished editorial infographic background/illustration for an Indonesian public-information newsroom.",
-    "Portrait 9:16 composition. Contemporary editorial design; strong visual hierarchy; clean grid; generous negative space; restrained navy, white, and teal palette; accessible contrast; crisp vector-like shapes with subtle depth.",
-    "Title/context: " + input.title + " — " + input.theme,
-    "Main message for visual direction: " + input.message,
-    "Audience: " + (input.audience || "masyarakat umum"),
-    "Region: " + (input.region || "Indonesia"),
-    "Visual style: " + (input.style.join(", ") || "faktual, tenang, informatif, ringkas"),
-    "Editor-provided facts for visual context only:\n" + facts,
-    "IMPORTANT: Do not invent statistics, labels, logos, watermarks, official seals, or charts with invented values. Do not try to render legible text; leave clear blank panels for exact Indonesian typography to be composited by the application. No gibberish letters.",
-    "One finished visual asset, not a mockup, not a photo of a poster, no device frame, no extra margins."
-  ].join("\n\n").slice(0, 5000);
-}
+
 
 export const startLumaInfographic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -44,13 +30,14 @@ export const startLumaInfographic = createServerFn({ method: "POST" })
     const apiKey = process.env.LUMA_API_KEY;
     if (!apiKey) throw new Error("Luma AI belum dikonfigurasi. Tambahkan LUMA_API_KEY pada environment server Vercel.");
 
+    const prompt = await getWorkspacePrompt("Infografis", data, buildLumaInfographicPrompt(data));
     const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {
       method: "POST",
       headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         generation_type: "image",
         model: process.env.LUMA_IMAGE_MODEL || "photon-1",
-        prompt: buildInfographicPrompt(data),
+        prompt,
         aspect_ratio: "9:16",
         format: "png",
         sync: false,

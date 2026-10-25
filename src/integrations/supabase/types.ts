@@ -31,6 +31,12 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      },
+      production_prompt_templates: {
+        Row: { id: string; output_type: string; output_family: string; prompt_text: string; version: number; updated_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; output_type: string; output_family: string; prompt_text: string; version?: number; updated_by?: string | null; created_at?: string; updated_at?: string }
+        Update: { id?: string; output_type?: string; output_family?: string; prompt_text?: string; version?: number; updated_by?: string | null; created_at?: string; updated_at?: string }
+        Relationships: []
       }
     }
     Views: {

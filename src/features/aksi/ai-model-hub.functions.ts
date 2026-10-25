@@ -65,6 +65,15 @@ export const verifyAiProvider = createServerFn({ method: "POST" })
         if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Provider membatasi permintaan; coba lagi nanti." : "Uji API Gemini gagal. Periksa secret, izin, dan nama model." };
         const payload = z.object({ candidates: z.array(z.unknown()).min(1) }).passthrough().safeParse(await response.json());
         if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "invalid-response", message: "Respons Gemini tidak sesuai format yang diharapkan." };
+      } else if (data.provider === "OpenAI") {
+        const response = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(12000) });
+        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial OpenAI gagal. Periksa secret dan akses akun." };
+      } else if (data.provider === "Anthropic") {
+        const response = await fetch("https://api.anthropic.com/v1/models", { headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(12000) });
+        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial Anthropic gagal. Periksa secret dan akses akun." };
+      } else if (data.provider === "Grok") {
+        const response = await fetch("https://api.x.ai/v1/models", { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(12000) });
+        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial xAI gagal. Periksa secret dan akses akun." };
       } else if (data.provider === "Luma") {
         // A successful Luma test intentionally creates a tiny real image job. No key is exposed.
         const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {

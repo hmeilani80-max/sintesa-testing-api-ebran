@@ -4,10 +4,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const providerSchema = z.enum(["Gemini", "Luma", "OpenAI", "Anthropic", "Grok"]);
 const familySchema = z.enum(["News", "Visual", "Video", "Audio"]);
+const outputTypeSchema = z.enum(["News Article", "Infografis", "Carousel", "Video Pendek", "Audio / Podcast"]);
 
 const providerConfig = {
-  Gemini: { env: "GEMINI_API_KEY", models: ["gemini-2.5-flash"], capabilities: ["News", "Visual", "Video", "Audio"] },
-  Luma: { env: "LUMA_API_KEY", models: ["photon-1"], capabilities: ["Visual"] },
+  Gemini: { env: "GEMINI_API_KEY", models: ["gemini-2.5-flash"], capabilities: ["News Article", "Carousel", "Video Pendek", "Audio / Podcast"] },
+  Luma: { env: "LUMA_API_KEY", models: ["photon-1"], capabilities: ["Infografis"] },
   OpenAI: { env: "OPENAI_API_KEY", models: ["gpt-4.1-mini"], capabilities: [] },
   Anthropic: { env: "ANTHROPIC_API_KEY", models: ["claude-sonnet-4-5"], capabilities: [] },
   Grok: { env: "XAI_API_KEY", models: ["grok-3-mini"], capabilities: [] },
@@ -51,7 +52,7 @@ export const verifyAiProvider = createServerFn({ method: "POST" })
     }
     const apiKey = process.env[config.env]?.trim();
     if (!apiKey) {
-      return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "missing-secret", message: `Secret server ${config.env} belum diatur di Vercel.` };
+      return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "missing-secret", message: `Secret server ${config.env} belum diatur di Vercel.` };
     }
 
     try {
@@ -61,9 +62,9 @@ export const verifyAiProvider = createServerFn({ method: "POST" })
           body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with the single word OK." }] }], generationConfig: { maxOutputTokens: 8, temperature: 0 } }),
           signal: AbortSignal.timeout(15000),
         });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Provider membatasi permintaan; coba lagi nanti." : "Uji API Gemini gagal. Periksa secret, izin, dan nama model." };
+        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Provider membatasi permintaan; coba lagi nanti." : "Uji API Gemini gagal. Periksa secret, izin, dan nama model." };
         const payload = z.object({ candidates: z.array(z.unknown()).min(1) }).passthrough().safeParse(await response.json());
-        if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "invalid-response", message: "Respons Gemini tidak sesuai format yang diharapkan." };
+        if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "invalid-response", message: "Respons Gemini tidak sesuai format yang diharapkan." };
       } else if (data.provider === "Luma") {
         // A successful Luma test intentionally creates a tiny real image job. No key is exposed.
         const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {
@@ -74,11 +75,11 @@ export const verifyAiProvider = createServerFn({ method: "POST" })
         if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Luma membatasi permintaan; coba lagi nanti." : "Uji generasi Luma gagal. Periksa secret, kuota, dan nama model." };
         const payload = z.object({ id: z.string().min(1), state: z.string().optional() }).passthrough().safeParse(await response.json());
         if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "invalid-response", message: "Luma tidak mengembalikan ID job yang valid." };
-        return { ok: true, provider: data.provider, model: data.model, family: data.family, status: "provider-tested", message: "Autentikasi dan permintaan generasi Luma berhasil. Ini membuat job gambar uji di akun Luma.", generationId: payload.data.id };
+        return { ok: true, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, ok: supportsOutput, status: supportsOutput ? "provider-tested" : "connected-unsupported-capability", message: supportsOutput ? "Autentikasi dan permintaan generasi Luma berhasil. Ini membuat job gambar uji di akun Luma." : "Koneksi provider berhasil, tetapi adapter ini tidak mendukung output yang dipilih.", generationId: payload.data.id };
       }
-      return { ok: true, provider: data.provider, model: data.model, family: data.family, status: "provider-tested", message: "Permintaan uji provider berhasil. Ini memvalidasi koneksi API, bukan alur simpan/muat ulang produksi." };
+      return { ok: supportsOutput, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: supportsOutput ? "provider-tested" : "connected-unsupported-capability", message: supportsOutput ? "Permintaan uji provider berhasil. Ini memvalidasi koneksi API, bukan alur simpan/muat ulang produksi." : "Kredensial/API terjangkau, tetapi belum ada adapter produksi untuk output ini." };
     } catch (error) {
-      console.error("[AI Model Hub] Provider verification failed", { provider: data.provider, family: data.family, kind: error instanceof Error ? error.name : "unknown" });
-      return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "network-error", message: "Provider tidak dapat dijangkau atau waktu uji habis." };
+      console.error("[AI Model Hub] Provider verification failed", { provider: data.provider, family: data.family, outputType: data.outputType, kind: error instanceof Error ? error.name : "unknown" });
+      return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "network-error", message: "Provider tidak dapat dijangkau atau waktu uji habis." };
     }
   });

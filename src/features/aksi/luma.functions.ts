@@ -1,4 +1,5 @@
 import { buildLumaInfographicPrompt } from "./prompt-templates";
+import { getWorkspacePrompt } from "./prompt-store.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -29,13 +30,14 @@ export const startLumaInfographic = createServerFn({ method: "POST" })
     const apiKey = process.env.LUMA_API_KEY;
     if (!apiKey) throw new Error("Luma AI belum dikonfigurasi. Tambahkan LUMA_API_KEY pada environment server Vercel.");
 
+    const prompt = await getWorkspacePrompt("Infografis", data, buildLumaInfographicPrompt(data));
     const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {
       method: "POST",
       headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         generation_type: "image",
         model: process.env.LUMA_IMAGE_MODEL || "photon-1",
-        prompt: buildLumaInfographicPrompt(data),
+        prompt,
         aspect_ratio: "9:16",
         format: "png",
         sync: false,

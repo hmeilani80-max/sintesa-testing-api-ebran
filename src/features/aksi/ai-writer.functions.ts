@@ -26,6 +26,8 @@ const contentSchema = z.object({
   voiceOver: z.boolean(),
   voice: z.string().max(200),
   transcript: z.string().max(100000),
+  assetUrl: z.string().url().optional(),
+  assetGenerationId: z.string().max(200).optional(),
 }).strict();
 
 const commonRules = `

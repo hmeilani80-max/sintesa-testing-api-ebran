@@ -25,6 +25,7 @@ export type ProductionContent = {
   headline: string; subtitle: string; lead: string; body: string; tags: string[];
   slides: { label: string; text: string }[]; highlights: { value: string; label: string }[]; caption: string;
   duration: number; format: "9:16" | "16:9"; voiceOver: boolean; voice: string; transcript: string;
+  assetUrl?: string | undefined; assetGenerationId?: string | undefined;
 };
 export type HistoryEntry = { version: number; label: "Generated" | "Regenerated" | "Edited" | "Diajukan" | "Approved" | "Perlu Revisi" | "Ditolak"; at: string };
 export type ProductionItem = {

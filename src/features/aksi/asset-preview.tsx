@@ -23,7 +23,7 @@ export function AssetPreview({ p, compact = false }: { p: ProductionItem; compac
     <div className="absolute inset-x-0 bottom-0 bg-background/85 p-3"><p className="text-[11px] leading-4">{message}</p><div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground"><span>{playing ? "0:04" : "0:00"}</span><div className="h-1 flex-1 bg-muted"><div className={cn("h-full bg-primary", playing ? "w-1/5" : "w-0")} /></div><span>{duration} · 9:16</span></div></div>
   </div>;
   if (p.type === "Infografis") return <div className={cn(frame, "mx-auto max-w-md")}>
-    <img src={briefingImg} alt="Aktivitas publik dan informasi resmi" className="h-24 w-full object-cover" />
+    <img src={c.assetUrl || briefingImg} alt="Visual infografis hasil generasi Luma AI" className="h-24 w-full object-cover" />
     <div className="p-3"><p className="text-[9px] font-semibold text-primary">SINTESA · INFORMASI PUBLIK</p><h3 className="mt-1 text-sm font-semibold leading-snug">{title}</h3><p className="mt-2 text-[11px] leading-4 text-muted-foreground">{message}</p>
       <ol className="mt-3 grid gap-2">{p.brief.points.slice(0, 3).map((point, i) => <li key={i} className="flex gap-2 text-[11px] leading-4"><ShieldCheck className="size-3.5 shrink-0 text-chart-2" />{point}</li>)}</ol>
       <div className="mt-3 border-l-2 border-chart-3 pl-2 text-[10px] leading-4"><strong className="text-chart-3">Klarifikasi</strong><p>{p.brief.points.find((x) => /\bbelum\b|klarifikasi/i.test(x)) ?? "Informasi yang belum dikonfirmasi tidak boleh dianggap sebagai fakta."}</p></div>

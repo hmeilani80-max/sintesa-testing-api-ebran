@@ -14,7 +14,7 @@ const outputTypes: OutputType[] = ["News Article", "Infografis", "Carousel", "Vi
 
 describe("Sintesa GitHub Prompt Manager", () => {
   it("exposes a versioned prompt catalog", () => {
-    expect(PROMPT_CATALOG_VERSION).toMatch(/^\\d+\\.\\d+\\.\\d+$/);
+    expect(PROMPT_CATALOG_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   it.each(outputTypes)("returns a non-empty Indonesian prompt for %s", (type) => {

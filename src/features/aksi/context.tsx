@@ -195,8 +195,8 @@ export function AksiProvider({ children }: { children: ReactNode }) {
               tags: [],
               slides: [],
               highlights: points.map((point) => ({
-                value: point.match(/[+-]?\\d+(?:[.,]\\d+)?%?/)?.[0] ?? "•",
-                label: point.replace(/[+-]?\\d+(?:[.,]\\d+)?%?/, "").trim() || point,
+                value: "•",
+                label: point,
               })),
               caption: current.brief.message,
               duration: 0,

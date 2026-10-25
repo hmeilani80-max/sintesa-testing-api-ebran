@@ -31,6 +31,7 @@ const contentSchema = z.object({
 }).strict();
 
 import { getProductionPrompt } from "./prompt-templates";
+import { getWorkspacePrompt } from "./prompt-store.server";
 
 const generateInput = z.object({ type: outputType, brief: briefSchema });
 export const generateProductionContent = createServerFn({ method: "POST" })
@@ -40,11 +41,12 @@ export const generateProductionContent = createServerFn({ method: "POST" })
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("AI belum dikonfigurasi. Tambahkan GEMINI_API_KEY pada environment server Vercel lalu redeploy.");
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const prompt = await getWorkspacePrompt(data.type, data.brief, getProductionPrompt(data.type, data.brief));
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: getProductionPrompt(data.type, data.brief) }] },
+        systemInstruction: { parts: [{ text: prompt }] },
         contents: [{ role: "user", parts: [{ text: "Buat konten sesuai brief dan skema JSON yang ditentukan." }] }],
         generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
       }),

@@ -12,6 +12,7 @@ const OUTPUTS = [
   { type: "Carousel", family: "Visual" },
   { type: "Video Pendek", family: "Video" },
   { type: "Audio / Podcast", family: "Audio" },
+  { type: "Distribusi Sosial", family: "Social" },
 ] as const;
 type OutputType = (typeof OUTPUTS)[number]["type"];
 type PromptRow = { id: string; output_type: OutputType; output_family: string; prompt_text: string; version: number; updated_at: string };

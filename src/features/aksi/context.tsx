@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProductionContent } from "./ai-writer.functions";
+import { generateSocialCaption } from "./social-ai.functions";
 import { getLumaInfographicStatus, startLumaInfographic } from "./luma.functions";
 import { saveProductionItem } from "./production.functions";
 
@@ -599,19 +600,35 @@ export function AksiProvider({ children }: { children: ReactNode }) {
           ),
         })),
 
-      regenerate: (id, postId) =>
-        editCampaign(id, (campaign) => ({
-          ...campaign,
-          posts: campaign.posts.map((post) => {
-            const asset = productions.find(
-              (production) => production.id === post.assetId,
-            );
-
-            return post.id === postId && asset
-              ? regeneratePost(post, asset, campaign.purpose)
-              : post;
-          }),
-        })),
+      regenerate: (id, postId) => {
+        const campaign = campaigns.find((item) => item.id === id);
+        const post = campaign?.posts.find((item) => item.id === postId);
+        const asset = post && productions.find((item) => item.id === post.assetId);
+        if (!campaign || !post || !asset) return;
+        void generateSocialCaption({ data: {
+          platform: post.platform as "X" | "Instagram" | "TikTok" | "Facebook" | "Threads" | "YouTube",
+          handle: post.handle,
+          assetTitle: asset.title,
+          assetType: asset.type,
+          headline: asset.content.headline || asset.title,
+          message: asset.brief.message,
+          facts: asset.brief.points,
+          purpose: campaign.purpose,
+          direction: campaign.direction,
+          previousVariant: post.variant,
+        } }).then(({ caption }) => {
+          editCampaign(id, (current) => ({
+            ...current,
+            posts: current.posts.map((item) => item.id === postId
+              ? { ...item, caption, variant: item.variant + 1, prep: "Siap", reason: undefined }
+              : item),
+          }));
+          audit("Caption AI " + post.platform + " untuk " + asset.title + " berhasil dibuat; menunggu review editor.");
+        }).catch((error: unknown) => {
+          console.error("[Distribusi Sosial] AI caption generation failed", error);
+          audit("Generate caption AI untuk " + post.platform + " gagal. Caption lama dipertahankan; periksa konfigurasi AI.");
+        });
+      },
 
       submitCampaign: (id) => {
         const at = now();

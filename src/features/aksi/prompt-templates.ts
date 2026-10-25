@@ -79,6 +79,29 @@ Gunakan body="", lead="", subtitle="", tags=[], slides=[], highlights=[], captio
 };
 
 
+export type LumaInfographicBrief = {
+  title: string; theme: string; message: string; points: string[]; style: string[];
+  audience?: string | undefined; region?: string | undefined;
+};
+
+export function buildLumaInfographicPrompt(input: LumaInfographicBrief) {
+  const facts = input.points.length
+    ? input.points.map((point, index) => `${index + 1}. ${point}`).join("\n")
+    : "Jangan menambahkan angka atau fakta spesifik; gunakan ilustrasi konseptual.";
+  return [
+    "Create a polished editorial infographic background/illustration for an Indonesian public-information newsroom.",
+    "Portrait 9:16 composition. Contemporary editorial design; strong visual hierarchy; clean grid; generous negative space; restrained navy, white, and teal palette; accessible contrast; crisp vector-like shapes with subtle depth.",
+    "Title/context: " + input.title + " — " + input.theme,
+    "Main message for visual direction: " + input.message,
+    "Audience: " + (input.audience || "masyarakat umum"),
+    "Region: " + (input.region || "Indonesia"),
+    "Visual style: " + (input.style.join(", ") || "faktual, tenang, informatif, ringkas"),
+    "Editor-provided facts for visual context only:\n" + facts,
+    "IMPORTANT: Do not invent statistics, labels, logos, watermarks, official seals, or charts with invented values. Do not try to render legible text; leave clear blank panels for exact Indonesian typography to be composited by the application. No gibberish letters.",
+    "One finished visual asset, not a mockup, not a photo of a poster, no device frame, no extra margins."
+  ].join("\n\n").slice(0, 5000);
+}
+
 export function getProductionPrompt(type: OutputType, brief: ProductionBrief): string {
   return prompts[type](brief);
 }

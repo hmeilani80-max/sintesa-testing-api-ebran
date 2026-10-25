@@ -60,5 +60,24 @@ export const saveProductionItem = createServerFn({ method: "POST" })
       console.error("[Produksi] RPC save gagal", { code: error.code, message: error.message });
       throw new Error("Produksi gagal disimpan. Perubahan lokal belum dianggap tersimpan.");
     }
-    return result;
+
+    // Read the row back through the authenticated session before reporting success.
+    // This guards the Generate -> persist -> reload path against false-positive saves.
+    const { data: persisted, error: readError } = await context.supabase
+      .from("production_items")
+      .select("id,snapshot")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (readError || !persisted) {
+      console.error("[Produksi] Read-after-write verification failed", { id: data.id, code: readError?.code });
+      throw new Error("Produksi tersimpan tetapi belum dapat dibaca kembali. Status belum dianggap berhasil; muat ulang dan periksa akses database.");
+    }
+    const snapshot = persisted.snapshot as unknown as { id?: unknown; status?: unknown; version?: unknown; content?: { assetUrl?: unknown; assetGenerationId?: unknown } };
+    if (snapshot.id !== data.id || snapshot.status !== data.status || snapshot.version !== data.version ||
+        (data.content.assetUrl && snapshot.content?.assetUrl !== data.content.assetUrl) ||
+        (data.content.assetGenerationId && snapshot.content?.assetGenerationId !== data.content.assetGenerationId)) {
+      console.error("[Produksi] Read-after-write snapshot mismatch", { id: data.id, expectedVersion: data.version, actualVersion: snapshot.version });
+      throw new Error("Data produksi yang dibaca kembali tidak cocok dengan hasil terbaru. Perubahan belum dianggap berhasil.");
+    }
+    return { result, persistenceVerified: true, verifiedId: data.id, verifiedVersion: data.version };
   });

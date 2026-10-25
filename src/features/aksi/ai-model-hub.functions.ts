@@ -15,11 +15,10 @@ const providerConfig = {
 } as const;
 
 function isConfigured(provider: keyof typeof providerConfig) {
-  const key = providerConfig[provider].env;
-  return Boolean(process.env[key]?.trim());
+  return Boolean(process.env[providerConfig[provider].env]?.trim());
 }
 
-/** Returns metadata only. Never returns secret values or raw provider errors. */
+/** Returns only configuration metadata; secret values are never serialized to the browser. */
 export const getAiProviderStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => ({
@@ -37,6 +36,7 @@ const verifyInput = z.object({
   provider: providerSchema,
   model: z.string().trim().min(1).max(100),
   family: familySchema,
+  outputType: outputTypeSchema,
 }).strict();
 
 export const verifyAiProvider = createServerFn({ method: "POST" })
@@ -47,48 +47,72 @@ export const verifyAiProvider = createServerFn({ method: "POST" })
     if (!config.models.includes(data.model as never)) {
       throw new Error("Model tidak ada dalam allowlist server untuk provider ini.");
     }
-    if (!config.capabilities.includes(data.family as never)) {
-      return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "unsupported-capability", message: "Provider ini belum memiliki adapter produksi yang mendukung jenis output tersebut." };
-    }
+
     const apiKey = process.env[config.env]?.trim();
     if (!apiKey) {
-      return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "missing-secret", message: `Secret server ${config.env} belum diatur di Vercel.` };
+      return { ok: false, connectionOk: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "missing-secret", message: "Secret server " + config.env + " belum diatur di Vercel." };
     }
 
+    const supportsOutput = config.capabilities.includes(data.outputType as never);
     try {
+      let response: Response;
       if (data.provider === "Gemini") {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(data.model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+        response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(data.model) + ":generateContent?key=" + encodeURIComponent(apiKey), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with the single word OK." }] }], generationConfig: { maxOutputTokens: 8, temperature: 0 } }),
           signal: AbortSignal.timeout(15000),
         });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Provider membatasi permintaan; coba lagi nanti." : "Uji API Gemini gagal. Periksa secret, izin, dan nama model." };
-        const payload = z.object({ candidates: z.array(z.unknown()).min(1) }).passthrough().safeParse(await response.json());
-        if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "invalid-response", message: "Respons Gemini tidak sesuai format yang diharapkan." };
       } else if (data.provider === "OpenAI") {
-        const response = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(12000) });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial OpenAI gagal. Periksa secret dan akses akun." };
+        response = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(12000) });
       } else if (data.provider === "Anthropic") {
-        const response = await fetch("https://api.anthropic.com/v1/models", { headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(12000) });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial Anthropic gagal. Periksa secret dan akses akun." };
+        response = await fetch("https://api.anthropic.com/v1/models", { headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(12000) });
       } else if (data.provider === "Grok") {
-        const response = await fetch("https://api.x.ai/v1/models", { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(12000) });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: "Pemeriksaan kredensial xAI gagal. Periksa secret dan akses akun." };
-      } else if (data.provider === "Luma") {
-        // A successful Luma test intentionally creates a tiny real image job. No key is exposed.
-        const response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {
-          method: "POST", headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        response = await fetch("https://api.x.ai/v1/models", { headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(12000) });
+      } else {
+        // Luma verification intentionally creates a tiny real test image job; this may consume quota.
+        response = await fetch("https://api.lumalabs.ai/dream-machine/v1/generations/image", {
+          method: "POST",
+          headers: { Accept: "application/json", Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({ generation_type: "image", model: data.model, prompt: "Minimal abstract teal and navy geometric test image, no text, no logos.", aspect_ratio: "9:16", format: "jpg", sync: false }),
           signal: AbortSignal.timeout(15000),
         });
-        if (!response.ok) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error", message: response.status === 429 ? "Luma membatasi permintaan; coba lagi nanti." : "Uji generasi Luma gagal. Periksa secret, kuota, dan nama model." };
-        const payload = z.object({ id: z.string().min(1), state: z.string().optional() }).passthrough().safeParse(await response.json());
-        if (!payload.success) return { ok: false, provider: data.provider, model: data.model, family: data.family, status: "invalid-response", message: "Luma tidak mengembalikan ID job yang valid." };
-        return { ok: true, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, ok: supportsOutput, status: supportsOutput ? "provider-tested" : "connected-unsupported-capability", message: supportsOutput ? "Autentikasi dan permintaan generasi Luma berhasil. Ini membuat job gambar uji di akun Luma." : "Koneksi provider berhasil, tetapi adapter ini tidak mendukung output yang dipilih.", generationId: payload.data.id };
       }
-      return { ok: supportsOutput, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: supportsOutput ? "provider-tested" : "connected-unsupported-capability", message: supportsOutput ? "Permintaan uji provider berhasil. Ini memvalidasi koneksi API, bukan alur simpan/muat ulang produksi." : "Kredensial/API terjangkau, tetapi belum ada adapter produksi untuk output ini." };
+
+      if (!response.ok) {
+        const status = response.status === 401 || response.status === 403 ? "invalid-credentials" : response.status === 429 ? "rate-limited" : "provider-error";
+        const message = response.status === 429 ? "Provider membatasi permintaan; coba lagi nanti." : "Uji API provider gagal. Periksa secret, akses akun, dan nama model.";
+        console.error("[AI Model Hub] Provider test failed", { provider: data.provider, status: response.status });
+        return { ok: false, connectionOk: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status, message };
+      }
+
+      let generationId: string | undefined;
+      if (data.provider === "Gemini") {
+        const parsed = z.object({ candidates: z.array(z.unknown()).min(1) }).passthrough().safeParse(await response.json());
+        if (!parsed.success) return { ok: false, connectionOk: true, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "invalid-response", message: "Respons Gemini tidak sesuai format yang diharapkan." };
+      } else if (data.provider === "Luma") {
+        const parsed = z.object({ id: z.string().min(1), state: z.string().optional() }).passthrough().safeParse(await response.json());
+        if (!parsed.success) return { ok: false, connectionOk: true, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "invalid-response", message: "Luma tidak mengembalikan ID job yang valid." };
+        generationId = parsed.data.id;
+      }
+
+      return {
+        ok: supportsOutput,
+        connectionOk: true,
+        provider: data.provider,
+        model: data.model,
+        family: data.family,
+        outputType: data.outputType,
+        status: supportsOutput ? "provider-tested" : "connected-unsupported-capability",
+        message: supportsOutput
+          ? data.provider === "Luma"
+            ? "Autentikasi dan permintaan generasi Luma berhasil. Job gambar uji dibuat di akun Luma; kuota mungkin terpakai."
+            : "Koneksi provider berhasil diuji. Ini belum membuktikan alur simpan/muat ulang produksi."
+          : "Kredensial provider valid, tetapi belum ada adapter produksi yang mendukung output ini.",
+        ...(generationId ? { generationId } : {}),
+      };
     } catch (error) {
-      console.error("[AI Model Hub] Provider verification failed", { provider: data.provider, family: data.family, outputType: data.outputType, kind: error instanceof Error ? error.name : "unknown" });
-      return { ok: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "network-error", message: "Provider tidak dapat dijangkau atau waktu uji habis." };
+      console.error("[AI Model Hub] Provider verification failed", { provider: data.provider, outputType: data.outputType, kind: error instanceof Error ? error.name : "unknown" });
+      return { ok: false, connectionOk: false, provider: data.provider, model: data.model, family: data.family, outputType: data.outputType, status: "network-error", message: "Provider tidak dapat dijangkau atau waktu uji habis." };
     }
   });

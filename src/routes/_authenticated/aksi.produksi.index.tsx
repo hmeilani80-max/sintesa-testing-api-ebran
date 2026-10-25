@@ -53,6 +53,7 @@ function Produksi() {
   const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
   const [provider, setProvider] = useState("Gemini");
   const [providerModel, setProviderModel] = useState("gemini-2.5-flash");
+  const [testOutputType, setTestOutputType] = useState<OutputType>("News Article");
   const [providerStatus, setProviderStatus] = useState<Awaited<ReturnType<typeof getAiProviderStatus>> | null>(null);
   const [verification, setVerification] = useState<{ ok: boolean; status: string; message: string } | null>(null);
   const [verifying, setVerifying] = useState(false);
@@ -138,7 +139,7 @@ function Produksi() {
                       {f === "Visual" ? <SelectItem value="visual-current">Gemini · Carousel; Luma · Infografis</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
                     </SelectContent>
                   </Select>
-                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setVerification(null); setModelDialog(true); void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null)); }}>
+                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setTestOutputType(f === "News" ? "News Article" : f === "Visual" ? "Infografis" : f === "Video" ? "Video Pendek" : "Audio / Podcast"); setVerification(null); setModelDialog(true); void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null)); }}>
                     + Tambahkan Model AI
                   </button>
                 </div>
@@ -164,6 +165,11 @@ function Produksi() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-1.5"><Label>Uji kemampuan output</Label>
+              <Select value={testOutputType} onValueChange={(value) => setTestOutputType(value as OutputType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                {OUTPUT_TYPES.filter((item) => item.family === modelFamily).map((item) => <SelectItem key={item.type} value={item.type}>{item.type}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
             <div className="grid gap-1.5"><Label>Model</Label>
               <Select value={providerModel} onValueChange={setProviderModel}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
                 {(provider === "Gemini" ? [["gemini-2.5-flash","gemini-2.5-flash"]] : provider === "Luma" ? [["photon-1","photon-1"]] : provider === "OpenAI" ? [["gpt-4.1-mini","gpt-4.1-mini"]] : provider === "Anthropic" ? [["claude-sonnet-4-5","claude-sonnet-4-5"]] : [["grok-3-mini","grok-3-mini"]]).map(([value,label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
@@ -175,7 +181,7 @@ function Produksi() {
               <p className="mt-2 text-muted-foreground">Status secret server: {providerStatus?.providers.find((item) => item.name === provider)?.configured ? "tersedia" : providerStatus ? "belum diatur" : "belum dapat dibaca"}.
                 {providerStatus?.providers.find((item) => item.name === provider)?.envName ? " Nama variabel: " + providerStatus.providers.find((item) => item.name === provider)?.envName + "." : ""}
               </p>
-              <p className="mt-1 text-muted-foreground">Kemampuan output yang didukung backend saat ini: Gemini untuk News/Visual/Video/Audio; Luma untuk Visual. OpenAI, Claude, dan Grok belum memiliki adapter produksi, jadi tidak akan lolos uji kemampuan.</p>
+              <p className="mt-1 text-muted-foreground">Kemampuan output yang didukung backend saat ini: Gemini untuk News Article, Carousel, Video Pendek, Audio / Podcast; Luma untuk Infografis. OpenAI, Claude, dan Grok belum memiliki adapter produksi, jadi tidak akan lolos uji kemampuan.</p>
             </div>
             {verification && <div role="status" className={"rounded-md border p-3 text-xs " + (verification.ok ? "border-emerald-600/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5")}>
               <p className="font-medium">{verification.ok ? "Uji provider berhasil" : "Uji provider belum berhasil"} · {verification.status}</p>
@@ -187,7 +193,7 @@ function Produksi() {
             <Button disabled={verifying} onClick={async () => {
               setVerifying(true); setVerification(null);
               try {
-                const result = await verifyAiProvider({ data: { provider: provider as "Gemini" | "Luma" | "OpenAI" | "Anthropic" | "Grok", model: providerModel, family: modelFamily } });
+                const result = await verifyAiProvider({ data: { provider: provider as "Gemini" | "Luma" | "OpenAI" | "Anthropic" | "Grok", model: providerModel, family: modelFamily, outputType: testOutputType } });
                 setVerification({ ok: result.ok, status: result.status, message: result.message });
                 void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
               } catch {

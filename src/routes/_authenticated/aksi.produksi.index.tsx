@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, Plus, Sparkles } from "lucide-react";
+import { Loader2, Plus, Sparkles, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
@@ -45,6 +45,13 @@ function Produksi() {
   const [origin, setOrigin] = useState<Origin>({ source: "Manual" });
   const [brief, setBrief] = useState<ProductionBrief>(EMPTY_BRIEF);
   const [types, setTypes] = useState<OutputType[]>([]);
+  const [models, setModels] = useState<Record<"News" | "Visual" | "Video" | "Audio", string>>({
+    News: "gemini-2.5-flash", Visual: "luma-photon", Video: "gemini-2.5-flash", Audio: "gemini-2.5-flash",
+  });
+  const [modelDialog, setModelDialog] = useState(false);
+  const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
+  const [provider, setProvider] = useState("Gemini");
+  const [providerModel, setProviderModel] = useState("gemini-2.5-flash");
 
   const start = (s?: Strategy) => {
     setOpen(true); setTypes([]);
@@ -119,6 +126,18 @@ function Produksi() {
             <div className="grid gap-3 sm:grid-cols-2">{(["News", "Visual", "Video", "Audio"] as const).map((f) => (
               <fieldset key={f} className="rounded-md border border-border p-3"><legend className="px-1 text-[11px] font-semibold uppercase text-muted-foreground">{f}</legend>
                 {OUTPUT_TYPES.filter((o) => o.family === f).map((o) => <label key={o.type} className="flex items-center gap-2 py-1 text-sm"><Checkbox checked={types.includes(o.type)} onCheckedChange={() => setTypes((cur) => (cur.includes(o.type) ? cur.filter((x) => x !== o.type) : [...cur, o.type]))} />{o.type}</label>)}
+                <div className="mt-3 border-t border-border pt-3">
+                  <Label className="text-xs">Model AI untuk {f}</Label>
+                  <Select value={models[f]} onValueChange={(value) => setModels((current) => ({ ...current, [f]: value }))}>
+                    <SelectTrigger aria-label="Model AI" className="mt-1 h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {f === "Visual" ? <SelectItem value="luma-photon">Luma · Infografis (jalur khusus)</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setModelDialog(true); }}>
+                    + Tambahkan Model AI
+                  </button>
+                </div>
               </fieldset>))}</div>
           </div>}
 
@@ -126,6 +145,35 @@ function Produksi() {
             {step > 1 && <Button variant="ghost" onClick={() => setStep(step - 1)}>Kembali</Button>}
             {step === 2 && <Button disabled={!brief.theme.trim() || !brief.message.trim()} onClick={() => setStep(3)}>Lanjut pilih output</Button>}
             {step === 3 && <Button disabled={!types.length} onClick={generate}><Sparkles />Generate Produksi{types.length ? ` (${types.length})` : ""}</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={modelDialog} onOpenChange={setModelDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Tambahkan Model AI · {modelFamily}</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <p className="text-sm text-muted-foreground">Model baru tidak akan muncul sebagai siap pakai sebelum kredensial server diverifikasi dan uji generasi end-to-end berhasil.</p>
+            <div className="grid gap-1.5"><Label>Provider</Label>
+              <Select value={provider} onValueChange={(value) => { setProvider(value); setProviderModel(value === "Luma" ? "photon-1" : value === "Gemini" ? "gemini-2.5-flash" : value === "OpenAI" ? "gpt-4.1-mini" : value === "Anthropic" ? "claude-sonnet-4-5" : "grok-3-mini"); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                  <SelectItem value="Gemini">Google Gemini</SelectItem><SelectItem value="Luma">Luma AI</SelectItem><SelectItem value="OpenAI">OpenAI</SelectItem><SelectItem value="Anthropic">Anthropic Claude</SelectItem><SelectItem value="Grok">xAI Grok</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5"><Label>Model</Label>
+              <Select value={providerModel} onValueChange={setProviderModel}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                {(provider === "Gemini" ? [["gemini-2.5-flash","gemini-2.5-flash"]] : provider === "Luma" ? [["photon-1","photon-1"]] : provider === "OpenAI" ? [["gpt-4.1-mini","gpt-4.1-mini"]] : provider === "Anthropic" ? [["claude-sonnet-4-5","claude-sonnet-4-5"]] : [["grok-3-mini","grok-3-mini"]]).map(([value,label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
+              <p className="flex items-center gap-2 font-medium"><ShieldCheck className="size-4" />Kunci API tetap di server</p>
+              <p className="mt-1 text-muted-foreground">Tambahkan secret provider di Vercel → Project → Settings → Environment Variables (Preview terlebih dahulu). Jangan masukkan API key ke form ini atau simpan di browser/Supabase.</p>
+              <p className="mt-2 text-muted-foreground">Status saat ini: perlu verifikasi. UI ini belum mengaktifkan provider baru; OpenAI, Claude, dan Grok memerlukan adapter backend dan tes generasi/penyimpanan sebelum tersedia sebagai model aktif.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModelDialog(false)}>Batal</Button>
+            <Button onClick={() => setModelDialog(false)}>Mengerti</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

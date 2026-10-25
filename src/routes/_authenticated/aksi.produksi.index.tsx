@@ -14,6 +14,7 @@ import { StatusPill, Stat, Trail } from "@/features/aksi/components";
 import { useAksi, type Origin } from "@/features/aksi/context";
 import { approvalLabel, DEMO_BRIEF, OUTPUT_TYPES, STYLE_OPTIONS, type OutputType, type ProductionBrief } from "@/features/aksi/data";
 import { aksiHead } from "@/features/aksi/meta";
+import { getAiProviderStatus, verifyAiProvider } from "@/features/aksi/ai-model-hub.functions";
 import { useStrategies } from "@/features/strategi/context";
 import type { Strategy } from "@/features/strategi/data";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,9 @@ function Produksi() {
   const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
   const [provider, setProvider] = useState("Gemini");
   const [providerModel, setProviderModel] = useState("gemini-2.5-flash");
+  const [providerStatus, setProviderStatus] = useState<Awaited<ReturnType<typeof getAiProviderStatus>> | null>(null);
+  const [verification, setVerification] = useState<{ ok: boolean; status: string; message: string } | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const start = (s?: Strategy) => {
     setOpen(true); setTypes([]);
@@ -134,7 +138,7 @@ function Produksi() {
                       {f === "Visual" ? <SelectItem value="visual-current">Gemini · Carousel; Luma · Infografis</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
                     </SelectContent>
                   </Select>
-                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setModelDialog(true); }}>
+                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setVerification(null); setModelDialog(true); void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null)); }}>
                     + Tambahkan Model AI
                   </button>
                 </div>
@@ -168,12 +172,28 @@ function Produksi() {
             <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
               <p className="flex items-center gap-2 font-medium"><ShieldCheck className="size-4" />Kunci API tetap di server</p>
               <p className="mt-1 text-muted-foreground">Tambahkan secret provider di Vercel → Project → Settings → Environment Variables (Preview terlebih dahulu). Jangan masukkan API key ke form ini atau simpan di browser/Supabase.</p>
-              <p className="mt-2 text-muted-foreground">Status saat ini: perlu verifikasi. UI ini belum mengaktifkan provider baru; OpenAI, Claude, dan Grok memerlukan adapter backend dan tes generasi/penyimpanan sebelum tersedia sebagai model aktif.</p>
+              <p className="mt-2 text-muted-foreground">Status secret server: {providerStatus?.providers.find((item) => item.name === provider)?.configured ? "tersedia" : providerStatus ? "belum diatur" : "belum dapat dibaca"}.
+                {providerStatus?.providers.find((item) => item.name === provider)?.envName ? " Nama variabel: " + providerStatus.providers.find((item) => item.name === provider)?.envName + "." : ""}
+              </p>
+              <p className="mt-1 text-muted-foreground">Kemampuan output yang didukung backend saat ini: Gemini untuk News/Visual/Video/Audio; Luma untuk Visual. OpenAI, Claude, dan Grok belum memiliki adapter produksi, jadi tidak akan lolos uji kemampuan.</p>
             </div>
+            {verification && <div role="status" className={"rounded-md border p-3 text-xs " + (verification.ok ? "border-emerald-600/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5")}>
+              <p className="font-medium">{verification.ok ? "Uji provider berhasil" : "Uji provider belum berhasil"} · {verification.status}</p>
+              <p className="mt-1">{verification.message}</p>
+            </div>}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setModelDialog(false)}>Batal</Button>
-            <Button onClick={() => setModelDialog(false)}>Mengerti</Button>
+            <Button variant="ghost" onClick={() => setModelDialog(false)}>Tutup</Button>
+            <Button disabled={verifying} onClick={async () => {
+              setVerifying(true); setVerification(null);
+              try {
+                const result = await verifyAiProvider({ data: { provider: provider as "Gemini" | "Luma" | "OpenAI" | "Anthropic" | "Grok", model: providerModel, family: modelFamily } });
+                setVerification({ ok: result.ok, status: result.status, message: result.message });
+                void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
+              } catch {
+                setVerification({ ok: false, status: "request-error", message: "Permintaan verifikasi gagal. Pastikan sesi login aktif dan periksa log server tanpa membuka secret." });
+              } finally { setVerifying(false); }
+            }}>{verifying ? "Menguji provider…" : "Uji koneksi & kemampuan"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

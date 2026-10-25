@@ -31,6 +31,8 @@ const productionPayload = z.object({
     caption: z.string().max(10000), duration: z.number().finite().min(0).max(3600),
     format: z.enum(["9:16", "16:9"]), voiceOver: z.boolean(), voice: z.string().max(200),
     transcript: z.string().max(100000),
+    assetUrl: z.string().url().optional(),
+    assetGenerationId: z.string().max(200).optional(),
   }),
   history: z.array(z.object({
     version: z.number().int().min(0).optional(),

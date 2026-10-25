@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProductionContent } from "./ai-writer.functions";
+import { generateLumaInfographic } from "./luma.functions";
 import { saveProductionItem } from "./production.functions";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
@@ -173,7 +174,41 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     patch(id, (p) => ({ ...p, status: "Generating" }));
     try {
       // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
-      const aiContent = await generateProductionContent({ data: { type: current.type, brief: current.brief } });
+      const aiContent = current.type === "Infografis"
+        ? await (async (): Promise<ProductionContent> => {
+            const luma = await generateLumaInfographic({ data: {
+              title: current.title,
+              theme: current.brief.theme,
+              message: current.brief.message,
+              points: current.brief.points,
+              style: current.brief.style,
+              audience: current.brief.audience,
+              region: current.brief.region,
+            } });
+            const points = current.brief.points.filter(Boolean).slice(0, 6);
+            return {
+              ...current.content,
+              headline: current.title,
+              subtitle: "",
+              lead: current.brief.message,
+              body: "",
+              tags: [],
+              slides: [],
+              highlights: points.map((point) => ({
+                value: point.match(/[+-]?\\d+(?:[.,]\\d+)?%?/)?.[0] ?? "•",
+                label: point.replace(/[+-]?\\d+(?:[.,]\\d+)?%?/, "").trim() || point,
+              })),
+              caption: current.brief.message,
+              duration: 0,
+              format: "9:16",
+              voiceOver: false,
+              voice: "Informatif",
+              transcript: "",
+              assetUrl: luma.assetUrl,
+              assetGenerationId: luma.generationId,
+            };
+          })()
+        : await generateProductionContent({ data: { type: current.type, brief: current.brief } });
       const variant = current.version === 0 ? 0 : current.variant + 1;
       const version = current.version + 1;
       const content: ProductionContent = { ...aiContent, ...settings };
@@ -187,7 +222,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       // Persist before presenting the item as successfully generated.
       await saveProductionItem({ data: next });
       setProductions((items) => items.map((item) => item.id === id ? next : item));
-      audit(`${next.title} v${version} berhasil dibuat oleh Gemini AI`);
+      audit(`${next.title} v${version} berhasil dibuat oleh ${next.type === "Infografis" ? "Luma AI" : "Gemini AI"}`);
     } catch (error) {
       console.error("[Produksi] AI generation/persistence failed", error);
       patch(id, (p) => ({ ...p, status: "Draft" }));

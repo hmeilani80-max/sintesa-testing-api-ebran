@@ -192,13 +192,13 @@ export function AksiProvider({ children }: { children: ReactNode }) {
               };
               await saveProductionItem({ data: next });
               setProductions((items) => items.map((candidate) => candidate.id === current.id ? next : candidate));
-              audit(\`\${next.title} v\${version} berhasil dibuat oleh Luma AI\`);
+              audit(`${next.title} v${version} berhasil dibuat oleh Luma AI`);
             } else if (status.state === "failed") {
               const { assetGenerationId: _jobId, assetUrl: _assetUrl, ...cleanContent } = current.content;
               const failed: ProductionItem = { ...current, status: "Draft", content: cleanContent, updated: "Gagal dibuat" };
               await saveProductionItem({ data: failed });
               setProductions((items) => items.map((candidate) => candidate.id === current.id ? failed : candidate));
-              audit(\`Generasi Luma untuk \${current.title} gagal; item dikembalikan ke Draft.\`);
+              audit(`Generasi Luma untuk ${current.title} gagal; item dikembalikan ke Draft.`);
             }
           } catch (error) {
             console.error("[Produksi] Luma status polling failed", { id: item.id, message: error instanceof Error ? error.message : "unknown" });
@@ -243,7 +243,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         };
         await saveProductionItem({ data: pending });
         setProductions((items) => items.map((item) => item.id === id ? pending : item));
-        audit(\`\${current.title}: job visual Luma \${job.generationId} dimulai\`);
+        audit(`${current.title}: job visual Luma ${job.generationId} dimulai`);
         return;
       }
       // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.

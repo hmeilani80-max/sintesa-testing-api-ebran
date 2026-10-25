@@ -23,13 +23,15 @@ jobs:
       # The repository currently has thousands of pre-existing Prettier violations.
       # Keep lint scoped to files changed by this feature and disable only the
       # formatting rule; do not rewrite unrelated application files.
-      - name: Lint changed prompt integration files
+      - name: Lint changed AI integration files
         run: >-
           bunx eslint
           src/features/aksi/PromptManagerDialog.tsx
           src/features/aksi/prompt-store.server.ts
           src/features/aksi/ai-writer.functions.ts
           src/features/aksi/luma.functions.ts
+          src/features/aksi/social-ai.functions.ts
+          src/features/aksi/context.tsx
           src/features/aksi/prompt-templates.test.ts
           src/routes/_authenticated/aksi.produksi.index.tsx
           src/integrations/supabase/types.ts

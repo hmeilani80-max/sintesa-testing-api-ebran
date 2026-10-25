@@ -1,33 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { generateProductionContent } from "./ai-writer.functions";
+import { getLumaInfographicStatus, startLumaInfographic } from "./luma.functions";
+import { saveProductionItem } from "./production.functions";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
-  applyDecision,
-  applySubmit,
-  buildItems,
-  canSubmit,
-  invalidateApproval,
-  generateContent,
-  initialOrders,
-  initialProductions,
-  type ApprovalStatus,
-  type Campaign,
-  type ChannelOrder,
-  type HistoryEntry,
-  type NewsOrder,
-  type NewsStatus,
-  type OutputType,
-  type ProductionBrief,
-  type ProductionContent,
-  type ProductionItem,
+  applyDecision, applySubmit, buildItems, canSubmit, invalidateApproval, initialOrders, initialProductions,
+  type ApprovalStatus, type Campaign, type ChannelOrder, type HistoryEntry, type NewsOrder, type NewsStatus, type OutputType, type ProductionBrief, type ProductionContent, type ProductionItem,
 } from "./data";
 import {
   advanceExecution,
@@ -164,7 +144,7 @@ const now = () =>
     minute: "2-digit",
   });
 
-const GENERATION_MS = 1400;
+
 
 export function AksiProvider({ children }: { children: ReactNode }) {
   const [cloud, setCloud] = useCloudState("aksi", {
@@ -181,6 +161,12 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   });
 
   const { productions, campaigns, orders, accounts, log } = cloud;
+  const [databaseReady, setDatabaseReady] = useState(false);
+  const productionsRef = useRef(productions);
+  const databaseReadyRef = useRef(databaseReady);
+  const activeLumaPolls = useRef(new Set<string>());
+  productionsRef.current = productions;
+  databaseReadyRef.current = databaseReady;
 
   // Tracks the result of the relational database read.
   // This flag does not trigger writes to Supabase.
@@ -220,6 +206,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         }));
 
         setDatabaseLoadStatus("loaded");
+        setDatabaseReady(true);
       } catch (error) {
         if (cancelled) return;
 
@@ -230,6 +217,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
 
         // Do not write fallback/demo data to the relational database.
         setDatabaseLoadStatus("error");
+        setDatabaseReady(false);
       }
     }
 
@@ -240,93 +228,111 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     };
   }, [setCloud]);
 
+  // Poll Luma jobs independently from unrelated dashboard state updates.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!databaseReadyRef.current) return;
+      const jobs = productionsRef.current.filter((item) => item.type === "Infografis" && item.status === "Generating" && item.content.assetGenerationId);
+      for (const item of jobs) {
+        const generationId = item.content.assetGenerationId!;
+        if (activeLumaPolls.current.has(generationId)) continue;
+        activeLumaPolls.current.add(generationId);
+        void (async () => {
+          try {
+            const status = await getLumaInfographicStatus({ data: { generationId } });
+            const current = productionsRef.current.find((candidate) => candidate.id === item.id);
+            if (!current || current.status !== "Generating" || current.content.assetGenerationId !== generationId) return;
+            if (status.state === "completed" && status.assetUrl) {
+              const version = current.version + 1;
+              const points = current.brief.points.filter(Boolean).slice(0, 6);
+              const next: ProductionItem = {
+                ...invalidateApproval(current, now(), current.version, version),
+                status: "Generated", approval: current.approval === "Disetujui" ? null : current.approval,
+                version, variant: current.version === 0 ? 0 : current.variant + 1,
+                content: { ...current.content, headline: current.title, subtitle: "", lead: current.brief.message, body: "", tags: [], slides: [],
+                  highlights: points.map((point) => ({ value: "•", label: point })), caption: current.brief.message, duration: 0, format: "9:16",
+                  voiceOver: false, voice: "Informatif", transcript: "", assetUrl: status.assetUrl, assetGenerationId: generationId },
+                history: [...current.history, { version, label: current.version === 0 ? "Generated" : "Regenerated", at: now() }],
+                updated: "Baru saja",
+              };
+              await saveProductionItem({ data: next });
+              setProductions((items) => items.map((candidate) => candidate.id === current.id ? next : candidate));
+              audit(`${next.title} v${version} berhasil dibuat oleh Luma AI`);
+            } else if (status.state === "failed") {
+              const { assetGenerationId: _jobId, assetUrl: _assetUrl, ...cleanContent } = current.content;
+              const failed: ProductionItem = { ...current, status: "Draft", content: cleanContent, updated: "Gagal dibuat" };
+              await saveProductionItem({ data: failed });
+              setProductions((items) => items.map((candidate) => candidate.id === current.id ? failed : candidate));
+              audit(`Generasi Luma untuk ${current.title} gagal; item dikembalikan ke Draft.`);
+            }
+          } catch (error) {
+            console.error("[Produksi] Luma status polling failed", { id: item.id, message: error instanceof Error ? error.message : "unknown" });
+          } finally {
+            activeLumaPolls.current.delete(generationId);
+          }
+        })();
+      }
+    }, 2500);
+    return () => clearInterval(timer);
+  }, []);
+
   const setProductions = field(setCloud, "productions");
   const setCampaigns = field(setCloud, "campaigns");
   const setOrders = field(setCloud, "orders");
   const setAccounts = field(setCloud, "accounts");
   const setLog = field(setCloud, "log");
+  const audit = (text: string) => setLog((cur) => [{ at: now(), text }, ...cur].slice(0, 30));
+  const patch = (id: string, fn: (p: ProductionItem) => ProductionItem) => setProductions((cur) => cur.map((p) => (p.id === id ? { ...fn(p), updated: "Baru saja" } : p)));
+  const editCampaign = (id: string, fn: (c: Campaign) => Campaign) => setCampaigns((cur) => cur.map((c) => (c.id === id ? fn(c) : c)));
+  const hist = (p: ProductionItem, label: HistoryEntry["label"], version = p.version): HistoryEntry[] => [...p.history, { version, label, at: now() }];
 
-  const audit = (text: string) =>
-    setLog((current) => [{ at: now(), text }, ...current].slice(0, 30));
-
-  const patch = (
-    id: string,
-    fn: (production: ProductionItem) => ProductionItem,
-  ) =>
-    setProductions((current) =>
-      current.map((production) =>
-        production.id === id
-          ? { ...fn(production), updated: "Baru saja" }
-          : production,
-      ),
-    );
-
-  const editCampaign = (
-    id: string,
-    fn: (campaign: Campaign) => Campaign,
-  ) =>
-    setCampaigns((current) =>
-      current.map((campaign) =>
-        campaign.id === id ? fn(campaign) : campaign,
-      ),
-    );
-
-  const hist = (
-    production: ProductionItem,
-    label: HistoryEntry["label"],
-    version = production.version,
-  ): HistoryEntry[] => [
-    ...production.history,
-    { version, label, at: now() },
-  ];
-
-  const runGeneration = (
-    id: string,
-    settings?: Partial<ProductionContent>,
-  ) => {
-    patch(id, (production) => ({
-      ...production,
-      status: "Generating",
-    }));
-
-    setTimeout(() => {
-      patch(id, (production) => {
-        const variant =
-          production.version === 0 ? 0 : production.variant + 1;
-        const version = production.version + 1;
-
-        const keep = {
-          duration: production.content.duration,
-          format: production.content.format,
-          voiceOver: production.content.voiceOver,
-          voice: production.content.voice,
-          ...settings,
+  const runGeneration = async (id: string, settings?: Partial<ProductionContent>, suppliedItem?: ProductionItem) => {
+    const current = suppliedItem ?? productions.find((item) => item.id === id);
+    if (!current) return;
+    patch(id, (p) => ({ ...p, status: "Generating" }));
+    try {
+      // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
+      // Infografis uses Luma as an asynchronous job; do not mark it Generated before the asset exists.
+      if (current.type === "Infografis") {
+        const job = await startLumaInfographic({ data: {
+          title: current.title, theme: current.brief.theme, message: current.brief.message,
+          points: current.brief.points, style: current.brief.style,
+          audience: current.brief.audience, region: current.brief.region,
+        } });
+        const pending: ProductionItem = {
+          ...current, status: "Generating",
+          content: { ...current.content, headline: current.title, lead: current.brief.message,
+            caption: current.brief.message, format: "9:16", voiceOver: false, duration: 0,
+            assetGenerationId: job.generationId, assetUrl: undefined },
+          updated: "Luma AI sedang membuat visual",
         };
-
-        return {
-          ...invalidateApproval(
-            production,
-            now(),
-            production.version,
-            version,
-          ),
-          status: "Generated",
-          variant,
-          version,
-          content: generateContent(
-            production.type,
-            production.brief,
-            variant,
-            keep,
-          ),
-          history: hist(
-            production,
-            production.version === 0 ? "Generated" : "Regenerated",
-            version,
-          ),
-        };
-      });
-    }, GENERATION_MS);
+        await saveProductionItem({ data: pending });
+        setProductions((items) => items.map((item) => item.id === id ? pending : item));
+        audit(`${current.title}: job visual Luma ${job.generationId} dimulai`);
+        return;
+      }
+      // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
+      const aiContent = await generateProductionContent({ data: { type: current.type, brief: current.brief } });
+      const variant = current.version === 0 ? 0 : current.variant + 1;
+      const version = current.version + 1;
+      const content: ProductionContent = { ...aiContent, ...settings };
+      const next: ProductionItem = {
+        ...invalidateApproval(current, now(), current.version, version),
+        status: "Generated", approval: current.approval === "Disetujui" ? null : current.approval,
+        variant, version, content,
+        history: [...current.history, { version, label: current.version === 0 ? "Generated" : "Regenerated", at: now() }],
+        updated: "Baru saja",
+      };
+      // Persist before presenting the item as successfully generated.
+      await saveProductionItem({ data: next });
+      setProductions((items) => items.map((item) => item.id === id ? next : item));
+      audit(`${next.title} v${version} berhasil dibuat oleh ${next.type === "Infografis" ? "Luma AI" : "Gemini AI"}`);
+    } catch (error) {
+      console.error("[Produksi] AI generation/persistence failed", error);
+      patch(id, (p) => ({ ...p, status: "Draft" }));
+      audit(`Generate ${current.title} gagal; konten tidak ditandai Generated. Periksa konfigurasi AI atau koneksi database.`);
+      throw error;
+    }
   };
 
   const value = useMemo<Value>(() => {
@@ -413,56 +419,28 @@ export function AksiProvider({ children }: { children: ReactNode }) {
         }
 
         const items = buildItems(brief, types, origin, 21 + productions.length);
-
-        setProductions((current) => [...items, ...current]);
-
-        audit(
-          `${items.length} item Produksi dibuat dari ${
-            origin.source === "Strategi"
-              ? `Strategi “${origin.strategyTitle}”`
-              : "brief manual"
-          }`,
-        );
-
-        for (const item of items) runGeneration(item.id);
-
-        return items.map((item) => item.id);
+        setProductions((cur) => [...items, ...cur]);
+        audit(`${items.length} item Produksi dibuat dari ${origin.source === "Strategi" ? `Strategi “${origin.strategyTitle}”` : "brief manual"}`);
+        for (const it of items) void runGeneration(it.id, undefined, it).catch(() => undefined);
+        return items.map((i) => i.id);
       },
-
       generate: (id, settings) => {
         if (databaseLoadStatus !== "loaded") return;
-
-        if (settings) {
-          patch(id, (production) => ({
-            ...production,
-            content: { ...production.content, ...settings },
-          }));
-        }
-
-        runGeneration(id, settings);
+        void runGeneration(id, settings).catch(() => undefined);
       },
-
       saveContent: (id, content) => {
         if (databaseLoadStatus !== "loaded") return;
-
-        patch(id, (production) => {
+        patch(id, (p) => {
           const at = now();
-          const nextVersion = production.version + 1;
-
+          const nextVersion = p.version + 1;
           return {
-            ...invalidateApproval(
-              production,
-              at,
-              production.version,
-              nextVersion,
-            ),
+            ...invalidateApproval(p, at, p.version, nextVersion),
             content,
             version: nextVersion,
-            history: hist(production, "Edited", nextVersion),
+            history: hist(p, "Edited", nextVersion),
           };
         });
       },
-
       submit: (id) => {
         if (databaseLoadStatus !== "loaded") return;
 

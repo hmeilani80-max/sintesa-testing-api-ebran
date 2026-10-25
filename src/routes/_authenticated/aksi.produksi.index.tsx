@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Loader2, Plus, Sparkles } from "lucide-react";
+import { Loader2, Plus, Sparkles, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
@@ -14,6 +14,7 @@ import { StatusPill, Stat, Trail } from "@/features/aksi/components";
 import { useAksi, type Origin } from "@/features/aksi/context";
 import { approvalLabel, DEMO_BRIEF, OUTPUT_TYPES, STYLE_OPTIONS, type OutputType, type ProductionBrief } from "@/features/aksi/data";
 import { aksiHead } from "@/features/aksi/meta";
+import { getAiProviderStatus, verifyAiProvider } from "@/features/aksi/ai-model-hub.functions";
 import { useStrategies } from "@/features/strategi/context";
 import type { Strategy } from "@/features/strategi/data";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,17 @@ function Produksi() {
   const [origin, setOrigin] = useState<Origin>({ source: "Manual" });
   const [brief, setBrief] = useState<ProductionBrief>(EMPTY_BRIEF);
   const [types, setTypes] = useState<OutputType[]>([]);
+  const [models, setModels] = useState<Record<"News" | "Visual" | "Video" | "Audio", string>>({
+    News: "gemini-2.5-flash", Visual: "visual-current", Video: "gemini-2.5-flash", Audio: "gemini-2.5-flash",
+  });
+  const [modelDialog, setModelDialog] = useState(false);
+  const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
+  const [provider, setProvider] = useState("Gemini");
+  const [providerModel, setProviderModel] = useState("gemini-2.5-flash");
+  const [testOutputType, setTestOutputType] = useState<OutputType>("News Article");
+  const [providerStatus, setProviderStatus] = useState<Awaited<ReturnType<typeof getAiProviderStatus>> | null>(null);
+  const [verification, setVerification] = useState<{ ok: boolean; status: string; message: string } | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   const start = (s?: Strategy) => {
     setOpen(true); setTypes([]);
@@ -119,6 +131,18 @@ function Produksi() {
             <div className="grid gap-3 sm:grid-cols-2">{(["News", "Visual", "Video", "Audio"] as const).map((f) => (
               <fieldset key={f} className="rounded-md border border-border p-3"><legend className="px-1 text-[11px] font-semibold uppercase text-muted-foreground">{f}</legend>
                 {OUTPUT_TYPES.filter((o) => o.family === f).map((o) => <label key={o.type} className="flex items-center gap-2 py-1 text-sm"><Checkbox checked={types.includes(o.type)} onCheckedChange={() => setTypes((cur) => (cur.includes(o.type) ? cur.filter((x) => x !== o.type) : [...cur, o.type]))} />{o.type}</label>)}
+                <div className="mt-3 border-t border-border pt-3">
+                  <Label className="text-xs">Model AI untuk {f}</Label>
+                  <Select value={models[f]} onValueChange={(value) => setModels((current) => ({ ...current, [f]: value }))}>
+                    <SelectTrigger aria-label="Model AI" className="mt-1 h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {f === "Visual" ? <SelectItem value="visual-current">Gemini · Carousel; Luma · Infografis</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setTestOutputType(f === "News" ? "News Article" : f === "Visual" ? "Infografis" : f === "Video" ? "Video Pendek" : "Audio / Podcast"); setVerification(null); setModelDialog(true); void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null)); }}>
+                    + Tambahkan Model AI
+                  </button>
+                </div>
               </fieldset>))}</div>
           </div>}
 
@@ -126,6 +150,56 @@ function Produksi() {
             {step > 1 && <Button variant="ghost" onClick={() => setStep(step - 1)}>Kembali</Button>}
             {step === 2 && <Button disabled={!brief.theme.trim() || !brief.message.trim()} onClick={() => setStep(3)}>Lanjut pilih output</Button>}
             {step === 3 && <Button disabled={!types.length} onClick={generate}><Sparkles />Generate Produksi{types.length ? ` (${types.length})` : ""}</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={modelDialog} onOpenChange={setModelDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Tambahkan Model AI · {modelFamily}</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <p className="text-sm text-muted-foreground">Model baru tidak akan muncul sebagai siap pakai sebelum kredensial server diverifikasi dan uji generasi end-to-end berhasil.</p>
+            <div className="grid gap-1.5"><Label>Provider</Label>
+              <Select value={provider} onValueChange={(value) => { setProvider(value); setProviderModel(value === "Luma" ? "photon-1" : value === "Gemini" ? "gemini-2.5-flash" : value === "OpenAI" ? "gpt-4.1-mini" : value === "Anthropic" ? "claude-sonnet-4-5" : "grok-3-mini"); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                  <SelectItem value="Gemini">Google Gemini</SelectItem><SelectItem value="Luma">Luma AI</SelectItem><SelectItem value="OpenAI">OpenAI</SelectItem><SelectItem value="Anthropic">Anthropic Claude</SelectItem><SelectItem value="Grok">xAI Grok</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5"><Label>Uji kemampuan output</Label>
+              <Select value={testOutputType} onValueChange={(value) => setTestOutputType(value as OutputType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                {OUTPUT_TYPES.filter((item) => item.family === modelFamily).map((item) => <SelectItem key={item.type} value={item.type}>{item.type}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
+            <div className="grid gap-1.5"><Label>Model</Label>
+              <Select value={providerModel} onValueChange={setProviderModel}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+                {(provider === "Gemini" ? [["gemini-2.5-flash","gemini-2.5-flash"]] : provider === "Luma" ? [["photon-1","photon-1"]] : provider === "OpenAI" ? [["gpt-4.1-mini","gpt-4.1-mini"]] : provider === "Anthropic" ? [["claude-sonnet-4-5","claude-sonnet-4-5"]] : [["grok-3-mini","grok-3-mini"]]).map(([value,label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
+              <p className="flex items-center gap-2 font-medium"><ShieldCheck className="size-4" />Kunci API tetap di server</p>
+              <p className="mt-1 text-muted-foreground">Tambahkan secret provider di Vercel → Project → Settings → Environment Variables (Preview terlebih dahulu). Jangan masukkan API key ke form ini atau simpan di browser/Supabase.</p>
+              <p className="mt-2 text-muted-foreground">Status secret server: {providerStatus?.providers.find((item) => item.name === provider)?.configured ? "tersedia" : providerStatus ? "belum diatur" : "belum dapat dibaca"}.
+                {providerStatus?.providers.find((item) => item.name === provider)?.envName ? " Nama variabel: " + providerStatus.providers.find((item) => item.name === provider)?.envName + "." : ""}
+              </p>
+              <p className="mt-1 text-muted-foreground">Kemampuan output yang didukung backend saat ini: Gemini untuk News Article, Carousel, Video Pendek, Audio / Podcast; Luma untuk Infografis. OpenAI, Claude, dan Grok belum memiliki adapter produksi, jadi tidak akan lolos uji kemampuan.</p>
+            </div>
+            {verification && <div role="status" className={"rounded-md border p-3 text-xs " + (verification.ok ? "border-emerald-600/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5")}>
+              <p className="font-medium">{verification.ok ? "Uji provider berhasil" : "Uji provider belum berhasil"} · {verification.status}</p>
+              <p className="mt-1">{verification.message}</p>
+            </div>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModelDialog(false)}>Tutup</Button>
+            <Button disabled={verifying} onClick={async () => {
+              setVerifying(true); setVerification(null);
+              try {
+                const result = await verifyAiProvider({ data: { provider: provider as "Gemini" | "Luma" | "OpenAI" | "Anthropic" | "Grok", model: providerModel, family: modelFamily, outputType: testOutputType } });
+                setVerification({ ok: result.ok, status: result.status, message: result.message });
+                void getAiProviderStatus().then(setProviderStatus).catch(() => setProviderStatus(null));
+              } catch {
+                setVerification({ ok: false, status: "request-error", message: "Permintaan verifikasi gagal. Pastikan sesi login aktif dan periksa log server tanpa membuka secret." });
+              } finally { setVerifying(false); }
+            }}>{verifying ? "Menguji provider…" : "Uji koneksi & kemampuan"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

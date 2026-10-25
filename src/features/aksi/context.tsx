@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { generateProductionContent } from "./ai-writer.functions";
-import { generateLumaInfographic } from "./luma.functions";
+import { getLumaInfographicStatus, startLumaInfographic } from "./luma.functions";
 import { saveProductionItem } from "./production.functions";
 
 import { field, useCloudState } from "@/hooks/use-cloud-state";
@@ -54,6 +54,11 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   });
   const { productions, campaigns, orders, accounts, log } = cloud;
   const [databaseReady, setDatabaseReady] = useState(false);
+  const productionsRef = useRef(productions);
+  const databaseReadyRef = useRef(databaseReady);
+  const activeLumaPolls = useRef(new Set<string>());
+  productionsRef.current = productions;
+  databaseReadyRef.current = databaseReady;
 
   // Relational Produksi becomes the operational source after loading succeeds.
   // Keep app_state/useCloudState intact as a compatibility fallback during rollout.
@@ -158,6 +163,54 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [productions, databaseReady]);
 
+  // Poll Luma jobs independently from unrelated dashboard state updates.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!databaseReadyRef.current) return;
+      const jobs = productionsRef.current.filter((item) => item.type === "Infografis" && item.status === "Generating" && item.content.assetGenerationId);
+      for (const item of jobs) {
+        const generationId = item.content.assetGenerationId!;
+        if (activeLumaPolls.current.has(generationId)) continue;
+        activeLumaPolls.current.add(generationId);
+        void (async () => {
+          try {
+            const status = await getLumaInfographicStatus({ data: { generationId } });
+            const current = productionsRef.current.find((candidate) => candidate.id === item.id);
+            if (!current || current.status !== "Generating" || current.content.assetGenerationId !== generationId) return;
+            if (status.state === "completed" && status.assetUrl) {
+              const version = current.version + 1;
+              const points = current.brief.points.filter(Boolean).slice(0, 6);
+              const next: ProductionItem = {
+                ...invalidateApproval(current, now(), current.version, version),
+                status: "Generated", approval: current.approval === "Disetujui" ? null : current.approval,
+                version, variant: current.version === 0 ? 0 : current.variant + 1,
+                content: { ...current.content, headline: current.title, subtitle: "", lead: current.brief.message, body: "", tags: [], slides: [],
+                  highlights: points.map((point) => ({ value: "•", label: point })), caption: current.brief.message, duration: 0, format: "9:16",
+                  voiceOver: false, voice: "Informatif", transcript: "", assetUrl: status.assetUrl, assetGenerationId: generationId },
+                history: [...current.history, { version, label: current.version === 0 ? "Generated" : "Regenerated", at: now() }],
+                updated: "Baru saja",
+              };
+              await saveProductionItem({ data: next });
+              setProductions((items) => items.map((candidate) => candidate.id === current.id ? next : candidate));
+              audit(\`\${next.title} v\${version} berhasil dibuat oleh Luma AI\`);
+            } else if (status.state === "failed") {
+              const { assetGenerationId: _jobId, assetUrl: _assetUrl, ...cleanContent } = current.content;
+              const failed: ProductionItem = { ...current, status: "Draft", content: cleanContent, updated: "Gagal dibuat" };
+              await saveProductionItem({ data: failed });
+              setProductions((items) => items.map((candidate) => candidate.id === current.id ? failed : candidate));
+              audit(\`Generasi Luma untuk \${current.title} gagal; item dikembalikan ke Draft.\`);
+            }
+          } catch (error) {
+            console.error("[Produksi] Luma status polling failed", { id: item.id, message: error instanceof Error ? error.message : "unknown" });
+          } finally {
+            activeLumaPolls.current.delete(generationId);
+          }
+        })();
+      }
+    }, 2500);
+    return () => clearInterval(timer);
+  }, []);
+
   const setProductions = field(setCloud, "productions");
   const setCampaigns = field(setCloud, "campaigns");
   const setOrders = field(setCloud, "orders");
@@ -174,41 +227,27 @@ export function AksiProvider({ children }: { children: ReactNode }) {
     patch(id, (p) => ({ ...p, status: "Generating" }));
     try {
       // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
-      const aiContent = current.type === "Infografis"
-        ? await (async (): Promise<ProductionContent> => {
-            const luma = await generateLumaInfographic({ data: {
-              title: current.title,
-              theme: current.brief.theme,
-              message: current.brief.message,
-              points: current.brief.points,
-              style: current.brief.style,
-              audience: current.brief.audience,
-              region: current.brief.region,
-            } });
-            const points = current.brief.points.filter(Boolean).slice(0, 6);
-            return {
-              ...current.content,
-              headline: current.title,
-              subtitle: "",
-              lead: current.brief.message,
-              body: "",
-              tags: [],
-              slides: [],
-              highlights: points.map((point) => ({
-                value: "•",
-                label: point,
-              })),
-              caption: current.brief.message,
-              duration: 0,
-              format: "9:16",
-              voiceOver: false,
-              voice: "Informatif",
-              transcript: "",
-              assetUrl: luma.assetUrl,
-              assetGenerationId: luma.generationId,
-            };
-          })()
-        : await generateProductionContent({ data: { type: current.type, brief: current.brief } });
+      // Infografis uses Luma as an asynchronous job; do not mark it Generated before the asset exists.
+      if (current.type === "Infografis") {
+        const job = await startLumaInfographic({ data: {
+          title: current.title, theme: current.brief.theme, message: current.brief.message,
+          points: current.brief.points, style: current.brief.style,
+          audience: current.brief.audience, region: current.brief.region,
+        } });
+        const pending: ProductionItem = {
+          ...current, status: "Generating",
+          content: { ...current.content, headline: current.title, lead: current.brief.message,
+            caption: current.brief.message, format: "9:16", voiceOver: false, duration: 0,
+            assetGenerationId: job.generationId, assetUrl: undefined },
+          updated: "Luma AI sedang membuat visual",
+        };
+        await saveProductionItem({ data: pending });
+        setProductions((items) => items.map((item) => item.id === id ? pending : item));
+        audit(\`\${current.title}: job visual Luma \${job.generationId} dimulai\`);
+        return;
+      }
+      // No local/dummy fallback: a missing or failed Gemini configuration must fail visibly.
+      const aiContent = await generateProductionContent({ data: { type: current.type, brief: current.brief } });
       const variant = current.version === 0 ? 0 : current.variant + 1;
       const version = current.version + 1;
       const content: ProductionContent = { ...aiContent, ...settings };

@@ -163,7 +163,7 @@ function InfographicWorkspace({ p }: { p: ProductionItem }) {
   const icons = [MapPin, ShieldCheck, Megaphone];
   return <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
     <div className="mx-auto w-full max-w-md overflow-hidden rounded-md border border-border bg-card">
-      <div className="relative h-36"><img src={briefingImg} alt="" loading="lazy" width={1024} height={1024} className="size-full object-cover opacity-60" /><div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+      <div className="relative h-36"><img src={p.content.assetUrl || briefingImg} alt="Visual infografis hasil generasi Luma AI" loading="lazy" width={1024} height={1024} className="size-full object-cover opacity-90" /><div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
         <p className="absolute left-5 top-4 rounded-sm bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">Info Resmi</p></div>
       <div className="-mt-8 relative px-5 pb-5">
         <h3 className="font-display text-xl font-semibold leading-tight">{p.content.headline}</h3>

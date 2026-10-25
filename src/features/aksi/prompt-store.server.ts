@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getRequest } from "@tanstack/react-start/server";
 import type { Database } from "@/integrations/supabase/types";
 
-type OutputType = "News Article" | "Infografis" | "Carousel" | "Video Pendek" | "Audio / Podcast";
+type OutputType = "News Article" | "Infografis" | "Carousel" | "Video Pendek" | "Audio / Podcast" | "Distribusi Sosial";
 type Brief = {
   theme: string; message: string; points: string[]; style: string[];
   audience?: string; region?: string; channels?: string[];

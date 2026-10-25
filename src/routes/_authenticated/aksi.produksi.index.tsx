@@ -46,7 +46,7 @@ function Produksi() {
   const [brief, setBrief] = useState<ProductionBrief>(EMPTY_BRIEF);
   const [types, setTypes] = useState<OutputType[]>([]);
   const [models, setModels] = useState<Record<"News" | "Visual" | "Video" | "Audio", string>>({
-    News: "gemini-2.5-flash", Visual: "luma-photon", Video: "gemini-2.5-flash", Audio: "gemini-2.5-flash",
+    News: "gemini-2.5-flash", Visual: "visual-current", Video: "gemini-2.5-flash", Audio: "gemini-2.5-flash",
   });
   const [modelDialog, setModelDialog] = useState(false);
   const [modelFamily, setModelFamily] = useState<"News" | "Visual" | "Video" | "Audio">("News");
@@ -131,7 +131,7 @@ function Produksi() {
                   <Select value={models[f]} onValueChange={(value) => setModels((current) => ({ ...current, [f]: value }))}>
                     <SelectTrigger aria-label="Model AI" className="mt-1 h-9 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {f === "Visual" ? <SelectItem value="luma-photon">Luma · Infografis (jalur khusus)</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
+                      {f === "Visual" ? <SelectItem value="visual-current">Gemini · Carousel; Luma · Infografis</SelectItem> : <SelectItem value="gemini-2.5-flash">Gemini · gemini-2.5-flash</SelectItem>}
                     </SelectContent>
                   </Select>
                   <button type="button" className="mt-2 text-xs font-medium text-primary underline-offset-4 hover:underline" onClick={() => { setModelFamily(f); setProvider(f === "Visual" ? "Luma" : "Gemini"); setProviderModel(f === "Visual" ? "photon-1" : "gemini-2.5-flash"); setModelDialog(true); }}>

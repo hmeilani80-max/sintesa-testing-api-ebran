@@ -1,118 +1,96 @@
-                }
-              : item,
-          ),
-        );
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { generateProductionContent } from "./ai-writer.functions";
+import { getLumaInfographicStatus, startLumaInfographic } from "./luma.functions";
+import { saveProductionItem } from "./production.functions";
 
-        audit(`Order ${id} dikirim ke ${order.channels.length} kanal`);
+import { field, useCloudState } from "@/hooks/use-cloud-state";
+import {
+  applyDecision, applySubmit, buildItems, canSubmit, invalidateApproval, initialOrders, initialProductions,
+  type ApprovalStatus, type Campaign, type ChannelOrder, type HistoryEntry, type NewsOrder, type NewsStatus, type OutputType, type ProductionBrief, type ProductionContent, type ProductionItem,
+} from "./data";
+import {
+  advanceExecution,
+  executionDone,
+  initialCampaigns,
+  regeneratePost,
+  retry,
+  SOCIAL_ACCOUNTS,
+  statusAfterDecision,
+  type AccountRole,
+  type AccountStatus,
+  type Post,
+  type SocialAccount,
+} from "./sosial";
 
-        return true;
-      },
+export type ApprovalKind =
+  | "Konten"
+  | "Distribusi Sosial"
+  | "Distribusi News";
 
-      setChannel: (id, channel, status, url) => {
-        setOrders((current) =>
-          current.map((order) => {
-            if (order.id !== id) return order;
+export type ApprovalRef = {
+  kind: ApprovalKind;
+  id: string;
+};
 
-            const channels = order.channels.map((item) =>
-              item.channel === channel
-                ? { ...item, status, url: url ?? item.url }
-                : item,
-            );
+export type QueueItem = {
+  key: string;
+  ref: ApprovalRef;
+  title: string;
+  group: "Konten" | "Distribusi";
+  subtype: string;
+  source: string;
+  status: ApprovalStatus;
+  version?: number | undefined;
+  submittedBy: string;
+  submittedAt: string;
+  submittedDay: string;
+};
 
-            const done = channels.every(
-              (item) =>
-                item.status === "Selesai" || item.status === "Ditolak",
-            );
+export type LogEntry = {
+  at: string;
+  text: string;
+};
 
-            return {
-              ...order,
-              channels,
-              status: done ? "Selesai" : order.status,
-            };
-          }),
-        );
+export type Origin = Pick<
+  ProductionItem,
+  | "source"
+  | "strategySlug"
+  | "strategyTitle"
+  | "situationSlug"
+  | "situationName"
+>;
 
-        audit(`Order ${id} · ${channel}: ${status}`);
-      },
+type Value = {
+  productions: ProductionItem[];
+  campaigns: Campaign[];
+  orders: NewsOrder[];
+  queue: QueueItem[];
+  log: LogEntry[];
 
-      setAccountConnection: (id, status) => {
-        setAccounts((current) =>
-          current.map((account) =>
-            account.id === id
-              ? { ...account, status, updatedAt: "Baru saja" }
-              : account,
-          ),
-        );
+  createProductions: (
+    brief: ProductionBrief,
+    types: OutputType[],
+    origin: Origin,
+  ) => string[];
 
-        audit(
-          `Akun ${id}: status koneksi diubah menjadi ${
-            status === "Ready"
-              ? "Terhubung"
-              : status === "Busy"
-                ? "Perlu Autentikasi Ulang"
-                : "Terputus"
-          }`,
-        );
-      },
+  generate: (
+    id: string,
+    settings?: Partial<ProductionContent>,
+  ) => void;
 
-      setAccountGroup: (id, group) =>
-        setAccounts((current) =>
-          current.map((account) =>
-            account.id === id
-              ? { ...account, group, updatedAt: "Baru saja" }
-              : account,
-          ),
-        ),
+  saveContent: (id: string, content: ProductionContent) => void;
+  submit: (id: string) => void;
 
-      setAccountLabel: (id, label) =>
-        setAccounts((current) =>
-          current.map((account) =>
-            account.id === id
-              ? { ...account, label, updatedAt: "Baru saja" }
-              : account,
-          ),
-        ),
+  decide: (
+    ref: ApprovalRef,
+    decision: Exclude<ApprovalStatus, "Menunggu">,
+    note?: string,
+  ) => void;
 
-      setAccountRoles: (id, roles) =>
-        setAccounts((current) =>
-          current.map((account) =>
-            account.id === id
-              ? { ...account, roles, updatedAt: "Baru saja" }
-              : account,
-          ),
-        ),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    productions,
-    campaigns,
-    orders,
-    log,
-    accounts,
-    databaseLoadStatus,
-  ]);
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-export function useAksi() {
-  const context = useContext(Ctx);
-
-  if (!context) {
-    throw new Error("useAksi must be used within AksiProvider");
-  }
-
-  return context;
-}
-
-/** Each Produksi item is itself one output; kept as {production, output} for distribution pages. */
-export function findOutput(
-  productions: ProductionItem[],
-  outputId: string,
-) {
-  const production = productions.find((item) => item.id === outputId);
-
-  return production
-    ? { production, output: production }
-    : undefined;
-}
+  createCampaign: (
+    c: Omit<
+      Campaign,
+      "id" | "status" | "approval" | "history" | "approvals"
+    >,
+    submit: boolean,

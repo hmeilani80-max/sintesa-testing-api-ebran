@@ -117,7 +117,7 @@ function ArticleWorkspace({ p }: { p: ProductionItem }) {
       <p className="text-sm font-medium leading-7">{draft.lead}</p>
       {draft.body.split("\n\n").map((para, i) => <p key={i} className="mt-3 text-sm leading-7 text-muted-foreground">{para}</p>)}
       <div className="mt-4 flex flex-wrap gap-1.5">{draft.tags.filter(Boolean).map((t) => <span key={t} className="rounded-sm bg-secondary px-2 py-0.5 text-[10px]">{t}</span>)}</div>
-      <p className="mt-4 border-t border-border pt-3 text-[11px] text-muted-foreground">Sumber: Data SINTESA, Laporan Analyst, News Source</p>
+      <p className="mt-4 border-t border-border pt-3 text-[11px] text-muted-foreground">Catatan editorial: sumber dan rujukan belum dilampirkan. Editor wajib memeriksa fakta serta melengkapi sumber sebelum publikasi.</p>
     </article>}
   </div>;
 }

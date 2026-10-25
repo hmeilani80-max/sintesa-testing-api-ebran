@@ -128,7 +128,7 @@ export const generateProductionContent = createServerFn({ method: "POST" })
     if (data.type === "Infografis" && content.highlights.length < 3) throw new Error("Hasil infografis kurang dari 3 poin. Silakan generate ulang.");
     if ((data.type === "Video Pendek" || data.type === "Audio / Podcast") && !content.transcript.trim()) throw new Error("Naskah AI kosong. Silakan generate ulang.");
     if (data.type === "News Article") {
-      const paragraphs = content.body.split(/\\n\\s*\\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
+      const paragraphs = content.body.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
       if (!content.headline.trim() || !content.lead.trim() || content.body.trim().length < 350 || paragraphs.length < 3) {
         throw new Error("Artikel AI belum lengkap atau belum memiliki paragraf yang cukup. Silakan generate ulang.");
       }

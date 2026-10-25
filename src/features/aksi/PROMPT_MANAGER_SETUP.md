@@ -1,26 +1,23 @@
-# Prompt Manager Sintesa (GitHub-managed)
+# Prompt Manager Sintesa (Supabase)
 
-Prompt untuk produksi disimpan sebagai kode dan dikelola melalui GitHub pull request. Tidak ada prompt yang disimpan di browser atau database; tidak diperlukan migrasi atau perubahan RLS Supabase.
+Prompt produksi disimpan di `public.production_prompt_templates` dan dapat diedit langsung di aplikasi melalui **Aksi → Produksi → Buat Produksi → Langkah 3 → Kelola Prompt AI**.
 
-## Lokasi
+## Lokasi kode
 
-- `src/features/aksi/prompt-templates.ts`: katalog prompt, versi katalog, serta prompt Luma untuk Visual/Infografis.
-- `src/features/aksi/ai-writer.functions.ts`: validasi brief, pemanggilan provider, dan validasi hasil; memanggil katalog prompt untuk News, Carousel, Video, dan Audio.
-- `src/features/aksi/luma.functions.ts`: endpoint server Luma; memanggil prompt Visual dari katalog.
-- `src/features/aksi/prompt-templates.test.ts`: tes prompt catalog.
+- `src/features/aksi/PromptManagerDialog.tsx`: editor aplikasi untuk memilih tipe output, mengedit prompt, dan menyimpan ke Supabase.
+- `src/features/aksi/prompt-store.server.ts`: membaca prompt aktif menggunakan sesi pengguna yang terautentikasi dan mengisi placeholder brief.
+- `src/features/aksi/ai-writer.functions.ts`: menggunakan prompt database untuk News Article, Carousel, Video Pendek, dan Audio / Podcast.
+- `src/features/aksi/luma.functions.ts`: menggunakan prompt database untuk Infografis Luma.
+- `supabase/migrations/20261026000100_create_production_prompt_templates.sql`: tabel, RLS, grant, dan prompt awal.
 
-## Cara mengubah prompt
+## Placeholder
 
-1. Buat branch fitur dari `main`.
-2. Edit prompt di `prompt-templates.ts`; pertahankan aturan bahwa brief adalah input, bukan instruksi yang dapat mengesampingkan aturan editorial.
-3. Naikkan `PROMPT_CATALOG_VERSION` bila perubahan mengubah perilaku prompt secara material.
-4. Jalankan `npm test -- src/features/aksi/prompt-templates.test.ts`, `npm run lint`, dan `npm run build`.
-5. Buka pull request dan periksa preview/build sebelum merge.
+`{{theme}}`, `{{message}}`, `{{points}}`, `{{style}}`, `{{audience}}`, `{{region}}`, `{{channels}}`.
 
-## Batasan
+## Akses dan keamanan
 
-- API keys tetap hanya di environment server Vercel; jangan pernah menambahkan secret ke prompt, commit, atau UI.
-- Prompt di GitHub adalah konfigurasi statis saat build/deploy, bukan editor prompt live di aplikasi. Perubahan prompt memerlukan commit dan deployment baru.
-- Model AI di dropdown belum otomatis dapat mengganti provider untuk setiap item; routing provider saat ini tetap mengikuti adapter backend yang tersedia.
-- OpenAI, Anthropic/Claude, dan Grok belum memiliki adapter produksi pada jalur generasi konten.
-- Tidak ada perubahan schema, data, atau RLS Supabase.
+- Hanya pengguna terautentikasi yang dapat membaca atau mengedit prompt.
+- Prompt adalah konfigurasi workspace bersama bagi pengguna yang sudah login.
+- API keys tetap di environment server Vercel dan tidak disimpan di database.
+- Jika lookup database gagal, backend memakai prompt statis fallback agar generasi tidak langsung berhenti.
+- Kolom `version` naik setiap kali prompt disimpan; tabel saat ini menyimpan versi terkini per output type, bukan arsip seluruh versi.

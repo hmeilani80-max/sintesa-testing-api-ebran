@@ -11,7 +11,7 @@ Configure these variables in the server environment (Vercel Project Settings →
 
 The repository intentionally contains no key. Until the key is configured, Generate Produksi fails closed: the item is returned to Draft and is not labelled Generated. It does not fall back to the old deterministic dummy generator.
 
-## Prompt families
+## First rollout: News Article\n\nThe first AI output to verify is **Produksi → News Article**. The authenticated server function `generateProductionContent` uses `GEMINI_API_KEY` only on the server and the `GEMINI_MODEL` setting (default `gemini-2.5-flash`). It returns structured JSON, validates the response, and refuses to mark an incomplete article as Generated.\n\nNews Article output contract:\n- Headline, subtitle, lead, 4–7 concise body paragraphs, and 3–8 tags.\n- Indonesian newsroom tone; the brief is the only factual source.\n- No invented quotes, dates, locations, official attribution, source names, numbers, or verification claims.\n- Missing source details are disclosed as an editorial verification task.\n- Human editorial review remains mandatory; generation does not approve or publish.\n\n## Prompt families
 
 The server-side gateway has independent instructions for:
 

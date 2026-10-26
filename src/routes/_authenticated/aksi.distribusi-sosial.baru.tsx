@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, CheckCircle2, Save, Send, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { generateSocialCaption } from "@/features/aksi/social-ai.functions";
 
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,8 @@ function NewDistribution() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsKey, setPostsKey] = useState("");
   const [notice, setNotice] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   const assets = approved.filter((p) => contentIds.includes(p.id));
   const suggested = recommendedPlatforms(assets.map((a) => a.type));
@@ -58,7 +61,44 @@ function NewDistribution() {
   const checks = readinessChecks(draft, productions);
   const sc = scale(draft, planned);
   const addAll = (fn: (a: (typeof pool)[number]) => boolean) => setAccounts((cur) => [...new Set([...cur, ...pool.filter((a) => fn(a) && selectable(a)).map((a) => a.id)])]);
-  const prepare = () => { const p = buildPosts(assets, chosen, purpose, timing, staggered); setPosts(p); setPostsKey(key); setNotice(`${p.length} posting berhasil disiapkan.`); };
+  const prepare = () => { const p = buildPosts(assets, chosen, purpose, timing, staggered); setPosts(p); setPostsKey(key); setNotice(`${p.length} posting berhasil disiapkan.`); setAiError(""); };
+  const generateCaptionsWithAi = async () => {
+    if (!posts.length || stale || aiBusy) return;
+    setAiBusy(true);
+    setAiError("");
+    let succeeded = 0;
+    try {
+      const generated = await Promise.all(posts.map(async (post) => {
+        const asset = productions.find((item) => item.id === post.assetId);
+        if (!asset) return post;
+        try {
+          const result = await generateSocialCaption({ data: {
+            platform: post.platform as "X" | "Instagram" | "TikTok" | "Facebook" | "Threads" | "YouTube",
+            handle: post.handle,
+            assetTitle: asset.title,
+            assetType: asset.type,
+            headline: asset.content.headline || asset.title,
+            message: asset.brief.message,
+            facts: asset.brief.points,
+            purpose,
+            direction,
+            previousVariant: post.variant,
+          } });
+          succeeded += 1;
+          return { ...post, caption: result.caption, variant: post.variant + 1, prep: "Siap" as const, reason: undefined };
+        } catch (error) {
+          console.error("[Distribusi Sosial] AI Studio caption failed", { postId: post.id, platform: post.platform, message: error instanceof Error ? error.message : "unknown" });
+          return post;
+        }
+      }));
+      setPosts(generated);
+      setPostsKey(key);
+      if (succeeded === posts.length) setNotice(`AI Studio menghasilkan ${succeeded} caption. Periksa dan edit sebelum mengajukan approval.`);
+      else setAiError(`AI menghasilkan ${succeeded} dari ${posts.length} caption. Caption yang gagal tetap dipertahankan; coba ulang setelah memeriksa konfigurasi server.`);
+    } finally {
+      setAiBusy(false);
+    }
+  };
   const canNext = step === 0 ? !!name.trim() && contentIds.length > 0 && platforms.length > 0 && purpose.length > 0 : step === 1 ? chosen.length > 0 && planned > 0 : step === 2 ? posts.length > 0 && !stale : true;
   const finish = (submit: boolean) => {
     const id = createCampaign({ name: name.trim(), productionId: contentIds[0] ?? "", contentIds, purpose, direction, platforms: [...new Set(chosen.map((a) => a.platform))], accounts: chosen.map((a) => a.id), timing, staggered, posts: stale ? [] : posts }, submit);
@@ -125,10 +165,12 @@ function NewDistribution() {
         <Box title="Rekomendasi Distribusi"><p className="mb-3 text-sm font-semibold text-primary">Sistem menyarankan {planned} paket publikasi</p><Summary /></Box>
       </div>}
 
-      {step === 2 && <Box title="Paket Publikasi" action={<Button onClick={prepare}><Sparkles />{posts.length ? "Siapkan Ulang Semua" : "Siapkan Semua Paket Publikasi"}</Button>}>
+      {step === 2 && <Box title="Paket Publikasi" action={<div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!posts.length || stale || aiBusy} onClick={() => void generateCaptionsWithAi()}><Sparkles />{aiBusy ? "AI sedang menulis…" : "AI Studio · Generate Caption"}</Button><Button onClick={prepare}><Sparkles />{posts.length ? "Siapkan Ulang Semua" : "Siapkan Semua Paket Publikasi"}</Button></div>}>
         <p className="mb-3 text-xs text-muted-foreground">Approved Content + Akun + Platform + Jadwal = unit posting siap tayang. Caption disesuaikan otomatis per karakter platform dan divariasikan antar akun, tetap mengacu pada Pesan Utama yang sama.</p>
         {notice && !stale && <p className="mb-3 flex items-center gap-2 text-xs text-chart-2"><CheckCircle2 className="size-4" />{notice}</p>}
         {stale && <p className="mb-3 text-xs text-chart-3">Rencana atau target berubah — siapkan ulang paket publikasi.</p>}
+        {aiError && <p role="alert" className="mb-3 text-xs text-chart-3">{aiError}</p>}
+        <p className="mb-3 text-[11px] text-muted-foreground">AI Studio memakai provider Gemini yang dikonfigurasi di server. Caption hasil AI tetap draft, dapat diedit, dan belum dipublikasikan sampai distribusi disetujui.</p>
         {posts.length > 0 && !stale ? <PostsBrowser posts={posts} productions={productions} editable
           onEdit={(id, caption) => setPosts((cur) => cur.map((p) => (p.id === id ? { ...p, caption, prep: "Diedit" } : p)))}
           onRegenerate={(id) => setPosts((cur) => cur.map((p) => { const a = productions.find((x) => x.id === p.assetId); return p.id === id && a ? regeneratePost(p, a, purpose) : p; }))} />

@@ -586,7 +586,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       createCampaign: (campaign, submit) => {
-        const id = `CMP-${String(16 + campaigns.length - 2).padStart(3, "0")}`;
+        const id = `CMP-${Date.now().toString(36).toUpperCase()}`;
         const at = now();
 
         const history = [

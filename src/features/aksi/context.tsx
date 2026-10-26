@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { supabase } from "@/integrations/supabase/client";
 import { generateProductionContent } from "./ai-writer.functions";
 import { generateSocialCaption } from "./social-ai.functions";
+import { loadSocialCampaigns, persistSocialCampaigns } from "./social-campaigns.repository";
 import { getLumaInfographicStatus, startLumaInfographic } from "./luma.functions";
 import { saveProductionItem } from "./production.functions";
 
@@ -162,6 +163,8 @@ export function AksiProvider({ children }: { children: ReactNode }) {
 
   const { productions, campaigns, orders, accounts, log } = cloud;
   const [databaseReady, setDatabaseReady] = useState(false);
+  const [campaignsRelationalReady, setCampaignsRelationalReady] = useState(false);
+  const campaignSyncInFlight = useRef(false);
   const productionsRef = useRef(productions);
   const databaseReadyRef = useRef(databaseReady);
   const activeLumaPolls = useRef(new Set<string>());
@@ -227,6 +230,40 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [setCloud]);
+
+  // Load the authenticated user's relational campaign records. Empty relational storage
+  // does not import the demo campaigns as real data; the repository filters those seeds.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCampaigns() {
+      try {
+        const restored = await loadSocialCampaigns();
+        if (cancelled) return;
+        if (restored && restored.length) setCampaigns(restored);
+      } catch (error) {
+        console.error("[Distribusi Sosial] Gagal memuat kampanye relasional.", error);
+      } finally {
+        if (!cancelled) setCampaignsRelationalReady(true);
+      }
+    }
+    void loadCampaigns();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Keep relational parent/target/post/approval/history records in sync with campaign edits.
+  // Demo seed records are intentionally excluded by the repository.
+  useEffect(() => {
+    if (!campaignsRelationalReady || campaignSyncInFlight.current) return;
+    const timer = setTimeout(() => {
+      campaignSyncInFlight.current = true;
+      void persistSocialCampaigns(campaigns, accounts)
+        .catch((error: unknown) => {
+          console.error("[Distribusi Sosial] Gagal menyimpan kampanye relasional.", error);
+        })
+        .finally(() => { campaignSyncInFlight.current = false; });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [campaigns, accounts, campaignsRelationalReady]);
 
   // Poll Luma jobs independently from unrelated dashboard state updates.
   useEffect(() => {
@@ -549,7 +586,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
       },
 
       createCampaign: (campaign, submit) => {
-        const id = `CMP-${String(16 + campaigns.length - 2).padStart(3, "0")}`;
+        const id = `CMP-${Date.now().toString(36).toUpperCase()}`;
         const at = now();
 
         const history = [

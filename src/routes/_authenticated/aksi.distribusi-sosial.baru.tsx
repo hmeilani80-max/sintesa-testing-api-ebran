@@ -24,6 +24,14 @@ export const Route = createFileRoute("/_authenticated/aksi/distribusi-sosial/bar
 });
 
 const STEPS = ["Rencana", "Target", "Paket Publikasi", "Review & Approval"];
+const localDate = (offsetDays = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const flip = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 const chip = (on: boolean) => cn("rounded-md border px-2.5 py-1 text-xs transition-colors", on ? "border-brand bg-brand/15 text-foreground" : "border-border text-muted-foreground hover:text-foreground");
 
@@ -38,7 +46,7 @@ function NewDistribution() {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [direction, setDirection] = useState("");
   const [accounts, setAccounts] = useState<string[]>([]);
-  const [timing, setTiming] = useState<Timing>({ mode: "Jadwal", start: "2026-10-09", end: "2026-10-10", from: "09:00", to: "18:00" });
+  const [timing, setTiming] = useState<Timing>({ mode: "Jadwal", start: localDate(1), end: localDate(2), from: "09:00", to: "18:00" });
   const [staggered, setStaggered] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsKey, setPostsKey] = useState("");
@@ -99,7 +107,20 @@ function NewDistribution() {
       setAiBusy(false);
     }
   };
-  const canNext = step === 0 ? !!name.trim() && contentIds.length > 0 && platforms.length > 0 && purpose.length > 0 : step === 1 ? chosen.length > 0 && planned > 0 : step === 2 ? posts.length > 0 && !stale : true;
+  const validTiming = timing.mode === "Segera" || (
+    !!timing.start &&
+    !!timing.end &&
+    timing.end >= timing.start &&
+    !!timing.from &&
+    !!timing.to &&
+    timing.to > timing.from
+  );
+  const timingError = timing.mode === "Jadwal" && timing.end < timing.start
+    ? "Tanggal selesai harus sama dengan atau setelah tanggal mulai."
+    : timing.mode === "Jadwal" && timing.to <= timing.from
+      ? "Jam selesai harus setelah jam mulai."
+      : "";
+  const canNext = step === 0 ? !!name.trim() && contentIds.length > 0 && platforms.length > 0 && purpose.length > 0 : step === 1 ? chosen.length > 0 && planned > 0 && validTiming : step === 2 ? posts.length > 0 && !stale : true;
   const finish = (submit: boolean) => {
     const id = createCampaign({ name: name.trim(), productionId: contentIds[0] ?? "", contentIds, purpose, direction, platforms: [...new Set(chosen.map((a) => a.platform))], accounts: chosen.map((a) => a.id), timing, staggered, posts: stale ? [] : posts }, submit);
     navigate({ to: "/aksi/distribusi-sosial/$id", params: { id } });
@@ -156,7 +177,7 @@ function NewDistribution() {
           <div className="mb-3 flex gap-2">{(["Segera", "Jadwal"] as const).map((m) => <Button variant="outline" key={m} type="button" className={chip(timing.mode === m)} onClick={() => setTiming({ ...timing, mode: m })}>{m === "Segera" ? "Segera Setelah Disetujui" : "Jadwalkan"}</Button>)}</div>
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="grid gap-1.5"><Label htmlFor="ds">Tanggal mulai</Label><Input id="ds" type="date" value={timing.start} onChange={(e) => setTiming({ ...timing, start: e.target.value })} /></div>
-            {timing.mode === "Jadwal" && <div className="grid gap-1.5"><Label htmlFor="de">Tanggal selesai</Label><Input id="de" type="date" value={timing.end} onChange={(e) => setTiming({ ...timing, end: e.target.value })} /></div>}
+            {timing.mode === "Jadwal" && <div className="grid gap-1.5"><Label htmlFor="de">Tanggal selesai</Label><Input id="de" type="date" min={timing.start || localDate()} value={timing.end} onChange={(e) => setTiming({ ...timing, end: e.target.value })} /></div>}
             <div className="grid gap-1.5"><Label htmlFor="hf">Jam aktif mulai</Label><Input id="hf" type="time" value={timing.from} onChange={(e) => setTiming({ ...timing, from: e.target.value, windows: undefined })} /></div>
             <div className="grid gap-1.5"><Label htmlFor="ht">Jam aktif selesai</Label><Input id="ht" type="time" value={timing.to} onChange={(e) => setTiming({ ...timing, to: e.target.value, windows: undefined })} /></div>
           </div>
@@ -180,7 +201,7 @@ function NewDistribution() {
       {step === 3 && <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
         <div className="grid content-start gap-4">
           <Box title="Ringkasan"><dl className="grid gap-3 text-xs sm:grid-cols-2">
-            {[["Nama Distribusi", name.trim()], ["Approved Content", assets.map((a) => a.title).join(", ")], ["Tujuan", purpose.join(", ")], ["Platform", [...new Set(chosen.map((a) => a.platform))].join(", ")], ["Target Akun", `${chosen.length} akun`], ["Planned Posts", `${posts.length} planned posts`], ["Periode", timing.mode === "Segera" ? "Segera setelah disetujui" : `${periodLabel(timing)} 2026`], ["Waktu", timing.windows?.map((w) => `${w.from}–${w.to}`).join(", ") ?? `${timing.from}–${timing.to}`], ["Pola Penyebaran", staggered ? "Otomatis bertahap" : "Serentak"], ["Potensi Penyebaran", potential]].map(([k, v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-0.5 font-medium">{v}</dd></div>)}
+            {[["Nama Distribusi", name.trim()], ["Approved Content", assets.map((a) => a.title).join(", ")], ["Tujuan", purpose.join(", ")], ["Platform", [...new Set(chosen.map((a) => a.platform))].join(", ")], ["Target Akun", `${chosen.length} akun`], ["Planned Posts", `${posts.length} planned posts`], ["Periode", timing.mode === "Segera" ? "Segera setelah disetujui" : periodLabel(timing)], ["Waktu", timing.windows?.map((w) => `${w.from}–${w.to}`).join(", ") ?? `${timing.from}–${timing.to}`], ["Pola Penyebaran", staggered ? "Otomatis bertahap" : "Serentak"], ["Potensi Penyebaran", potential]].map(([k, v]) => <div key={k}><dt className="text-muted-foreground">{k}</dt><dd className="mt-0.5 font-medium">{v}</dd></div>)}
           </dl></Box>
           <Box title="Preview Sampel" action={<Button size="sm" variant="ghost" onClick={() => setStep(2)}>Lihat Semua Paket Publikasi</Button>}>
             <div className="grid gap-3 sm:grid-cols-3">{["X", "Instagram", "TikTok"].map((pl) => posts.find((p) => p.platform === pl && (pl !== "Instagram" || p.assetType === "Carousel")) ?? posts.find((p) => p.platform === pl)).filter((p): p is Post => !!p).map((p) => <PostMock key={p.id} post={p} asset={productions.find((a) => a.id === p.assetId)} />)}</div>

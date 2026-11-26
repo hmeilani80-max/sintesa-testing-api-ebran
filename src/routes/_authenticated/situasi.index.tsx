@@ -13,9 +13,9 @@ import { EwsLevelBadge, FilterBar, MetricGrid, RiskLabel } from "@/features/situ
 import { useSituations } from "@/features/situasi/context";
 import type { SituationEntry } from "@/features/situasi/data";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 const db = supabase as any;
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/situasi/")({
   head: () => ({ meta: [

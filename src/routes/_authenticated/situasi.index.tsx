@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, BellRing, Plus, Radar, RadioTower } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EwsLevelBadge, FilterBar, MetricGrid, RiskLabel } from "@/features/situasi/components";
 import { useSituations } from "@/features/situasi/context";
-import { getEws, type SituationEntry } from "@/features/situasi/data";
+import type { SituationEntry } from "@/features/situasi/data";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/situasi/")({
@@ -28,10 +29,23 @@ export const Route = createFileRoute("/_authenticated/situasi/")({
 
 const platforms = ["X", "Instagram", "TikTok", "Facebook", "YouTube", "Threads", "News"];
 
-function FindingCard({ item, monitored, onMonitor }: { item: SituationEntry; monitored: boolean; onMonitor: () => void }) {
-  const ews = getEws(item.slug);
+type EwsRow = {
+  slug: string;
+  level: "Rendah" | "Sedang" | "Tinggi" | "Kritis";
+  first_detected_at: string | null;
+  triggers: string[];
+  handling_status: string;
+  pic: string | null;
+  reason: string | null;
+  risk_score: number | null;
+  data_quality: "sufficient" | "insufficient";
+  evidence_count: number;
+  last_observed_at: string | null;
+};
+
+function FindingCard({ item, ews, monitored, onMonitor }: { item: SituationEntry; ews?: EwsRow; monitored: boolean; onMonitor: () => void }) {
   return <article className="flex h-full flex-col rounded-lg border border-border bg-card p-5">
-    <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase text-primary">Temuan Sistem</p><h3 className="mt-2 text-base font-semibold">{item.name}</h3></div><div className="flex flex-col items-end gap-1">{item.risk && <RiskLabel value={item.risk} />}{ews && <EwsLevelBadge level={ews.level} />}</div></div>
+    <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase text-primary">Temuan Sistem</p><h3 className="mt-2 text-base font-semibold">{item.name}</h3></div><div className="flex flex-col items-end gap-1">{item.risk && <RiskLabel value={item.risk} />}{ews && ews.data_quality === "sufficient" && <EwsLevelBadge level={ews.level} />}</div></div>
     <p className="mt-3 text-xs leading-5 text-muted-foreground">{item.description}</p>
     <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
       <div><dt className="text-muted-foreground">Volume</dt><dd className="mt-1 font-semibold text-chart-2">{item.growth}</dd></div>
@@ -39,9 +53,10 @@ function FindingCard({ item, monitored, onMonitor }: { item: SituationEntry; mon
       <div className="col-span-2"><dt className="text-muted-foreground">Narasi dominan</dt><dd className="mt-1 font-medium">{item.dominantNarrative}</dd></div>
       <div className="col-span-2"><dt className="text-muted-foreground">Pemicu</dt><dd className="mt-1 font-medium">{item.detectedReason}</dd></div>
       {ews && <>
-        <div><dt className="text-muted-foreground">Pertama terdeteksi</dt><dd className="mt-1 font-medium">{ews.firstDetected}</dd></div>
-        <div><dt className="text-muted-foreground">Status penanganan</dt><dd className="mt-1 font-medium">{ews.handlingStatus}</dd></div>
-        <div className="col-span-2"><dt className="text-muted-foreground">Indikator pemicu (EWS)</dt><dd className="mt-1 font-medium">{ews.triggers.join(" · ")}</dd></div>
+        <div><dt className="text-muted-foreground">Kualitas data</dt><dd className="mt-1 font-medium">{ews.data_quality === "sufficient" ? `Skor ${ews.risk_score ?? "—"}/100` : `Data belum cukup (${ews.evidence_count} observasi)`}</dd></div>
+        <div><dt className="text-muted-foreground">Pertama terdeteksi</dt><dd className="mt-1 font-medium">{ews.first_detected_at ? new Date(ews.first_detected_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }) : "—"}</dd></div>
+        <div><dt className="text-muted-foreground">Status penanganan</dt><dd className="mt-1 font-medium">{ews.handling_status}</dd></div>
+        <div className="col-span-2"><dt className="text-muted-foreground">Indikator pemicu (EWS)</dt><dd className="mt-1 font-medium">{ews.data_quality === "sufficient" ? ews.triggers.join(" · ") : "Belum cukup observasi aktual untuk menghitung pemicu risiko."}</dd></div>
         <div className="col-span-2"><dt className="text-muted-foreground">PIC</dt><dd className="mt-1 font-medium">{ews.pic ?? "Belum ditetapkan"}</dd></div>
       </>}
     </dl>
@@ -66,6 +81,33 @@ function SituationCatalogue() {
   const { findings, topics, monitorFinding, addTopic } = useSituations();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["X", "TikTok", "News"]);
+  const [ewsRows, setEwsRows] = useState<EwsRow[]>([]);
+  const [newFindings24h, setNewFindings24h] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEws() {
+      const [ewsResult, recentResult] = await Promise.all([
+        supabase.from("situasi_ews").select("slug,level,first_detected_at,triggers,handling_status,pic,reason,risk_score,data_quality,evidence_count,last_observed_at"),
+        supabase.from("situasi_system_findings").select("slug", { count: "exact", head: true })
+          .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+      ]);
+      if (cancelled) return;
+      if (ewsResult.error) {
+        console.error("[Situasi] Gagal memuat EWS:", ewsResult.error.message);
+        setEwsRows([]);
+      } else {
+        setEwsRows((ewsResult.data ?? []) as EwsRow[]);
+      }
+      if (recentResult.error) {
+        console.error("[Situasi] Gagal menghitung temuan baru:", recentResult.error.message);
+      } else {
+        setNewFindings24h(recentResult.count ?? 0);
+      }
+    }
+    void loadEws();
+    return () => { cancelled = true; };
+  }, [findings.length]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,8 +124,14 @@ function SituationCatalogue() {
     <div className="space-y-10">
       <section aria-labelledby="ews-title">
         <div className="mb-5 flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-md bg-destructive/10 text-destructive"><RadioTower className="size-4" /></span><div><h2 id="ews-title" className="text-lg font-semibold">EWS / Temuan Sistem</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Situasi yang terdeteksi otomatis berdasarkan lonjakan aktivitas, perubahan pola, risiko, atau indikator tidak biasa.</p></div></div>
-        <MetricGrid items={[{ value: "4", label: "Temuan Aktif" }, { value: "2", label: "Risiko Tinggi" }, { value: "7", label: "Early Warning Aktif" }, { value: "3", label: "Temuan Baru 24 Jam" }]} />
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">{findings.map((item) => <FindingCard key={item.slug} item={item} monitored={topics.some((topic) => topic.slug === item.slug)} onMonitor={() => monitorFinding(item.slug)} />)}</div>
+        <MetricGrid items={[
+          { value: String(findings.filter((item) => item.status === "Aktif" || item.status === "Baru").length), label: "Temuan Aktif" },
+          { value: String(findings.filter((item) => item.dataQuality === "sufficient" && (item.risk === "Tinggi" || item.risk === "Kritis")).length), label: "Risiko Tinggi" },
+          { value: String(ewsRows.filter((item) => item.data_quality === "sufficient" && (item.level === "Tinggi" || item.level === "Kritis") && item.handling_status !== "Selesai").length), label: "Early Warning Aktif" },
+          { value: String(newFindings24h), label: "Temuan Baru 24 Jam" },
+        ]} />
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">{findings.map((item) => <FindingCard key={item.slug} item={item} ews={ewsRows.find((row) => row.slug === item.slug)} monitored={topics.some((topic) => topic.slug === item.slug)} onMonitor={() => monitorFinding(item.slug)} />)}</div>
+        {!findings.length && <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Belum ada temuan sistem tersimpan di database.</div>}
       </section>
 
       <section aria-labelledby="topics-title" className="border-t border-border pt-8">

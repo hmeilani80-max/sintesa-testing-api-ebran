@@ -243,7 +243,8 @@ This pipeline collects public web evidence for three configurable categories: ne
   A category accepts one Actor object or an array. Actor IDs may be written as Apify Store `owner/actor` slugs; the backend converts them to the API's `owner~actor` form. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 30, hard maximum 500).
-- Optional `APIFY_MAX_TOTAL_CHARGE_USD`: per Actor run spend ceiling (default USD 0.10, hard maximum USD 25).
+- Optional `APIFY_MAX_TOTAL_CHARGE_USD`: per Actor run spend ceiling (default and enforced minimum USD 0.50, hard maximum USD 25). The initial TikTok run was rejected because USD 0.10 is below that Actor's minimum.
+- Optional `APIFY_MAX_CONCURRENT_RUNS`: account-wide active Actor run ceiling (default and hard maximum 5). The function checks Apify account runs before launching new Actors and defers queued Actors when all slots are occupied. Existing runs are polled on later invocations.
 
 ## GitHub Actions secret
 Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the same value as the Supabase Edge Function secret.
@@ -255,7 +256,7 @@ Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the
 - Province/region fields are copied only when present in Actor output; the pipeline does not infer a location. The provided government Actor configuration seeds the national portal and 38 provincial government domains; review domain changes periodically.
 - Sentiment and risk are not fabricated by the collector. The existing EWS database trigger computes risk only from its evidence rules.
 - Deduplication uses a SHA-256 item hash for raw items and source URL for promoted Apify observations.
-- Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds.
+- Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds. Actor starts are serialized through a queue and guarded by the Apify account-wide active-run count; no more than five Actor runs are launched concurrently by this pipeline.
 
 ## Actor selection
 Choose Actors in Apify Store that you are licensed and permitted to use. Confirm their current input schema, output fields, platform terms, rate limits, and pricing before adding them to `APIFY_SITUASI_ACTORS`. For national and all-province coverage, include countrywide searches and province-specific search terms or official provincial URLs in each Actor's own input. Avoid private-account scraping, login bypass, or collection of sensitive personal data.

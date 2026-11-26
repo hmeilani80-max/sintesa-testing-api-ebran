@@ -38,7 +38,8 @@ function cleanText(value: string): string {
 function elementContent(block: string, localName: string): string {
   const pattern = new RegExp("<(?:[\\w.-]+:)?" + localName + "(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?" + localName + "\\s*>", "i");
   const match = block.match(pattern);
-  return match ? cleanText(match[1]
+  if (!match) return "";
+  const decoded = match[1]
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&#x([\da-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
@@ -47,7 +48,8 @@ function elementContent(block: string, localName: string): string {
     .replace(/&quot;/gi, '"')
     .replace(/&apos;|&#39;/gi, "'")
     .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")) : "";
+    .replace(/&gt;/gi, ">");
+  return cleanText(decoded);
 }
 
 function elementAttribute(block: string, localName: string, attribute: string): string {
@@ -56,6 +58,7 @@ function elementAttribute(block: string, localName: string, attribute: string): 
   const doubleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*\"([^\"]*)\"", "i"));
   const singleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*'([^']*)'", "i"));
   const attr = doubleQuoted ?? singleQuoted;
+  return attr?.[1]?.trim() ?? "";
 }
 
 function parseFeed(xml: string): Array<{ title: string; description: string; link: string; published: string }> {

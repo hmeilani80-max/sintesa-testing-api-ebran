@@ -27,6 +27,7 @@ import { Route as AuthenticatedAksiKalenderTugasRouteImport } from './routes/_au
 import { Route as AuthenticatedAksiPersetujuanRouteImport } from './routes/_authenticated/aksi.persetujuan'
 import { Route as AuthenticatedAksiProduksiRouteImport } from './routes/_authenticated/aksi.produksi'
 import { Route as AuthenticatedSituasiIndexRouteImport } from './routes/_authenticated/situasi.index'
+import { Route as AuthenticatedSituasiSumberDataRouteImport } from './routes/_authenticated/situasi.sumber-data'
 import { Route as AuthenticatedSituasiSlugRouteImport } from './routes/_authenticated/situasi.$slug'
 import { Route as AuthenticatedStrategiIndexRouteImport } from './routes/_authenticated/strategi.index'
 import { Route as AuthenticatedStrategiSlugRouteImport } from './routes/_authenticated/strategi.$slug'
@@ -141,6 +142,12 @@ const AuthenticatedSituasiIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSituasiRoute,
   } as any)
+const AuthenticatedSituasiSumberDataRoute =
+  AuthenticatedSituasiSumberDataRouteImport.update({
+    id: '/sumber-data',
+    path: '/sumber-data',
+    getParentRoute: () => AuthenticatedSituasiRoute,
+  } as any)
 const AuthenticatedSituasiSlugRoute =
   AuthenticatedSituasiSlugRouteImport.update({
     id: '/$slug',
@@ -252,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/administrasi/': typeof AuthenticatedAdministrasiIndexRoute
   '/aksi/': typeof AuthenticatedAksiIndexRoute
   '/situasi/': typeof AuthenticatedSituasiIndexRoute
+  '/situasi/sumber-data': typeof AuthenticatedSituasiSumberDataRoute
   '/strategi/': typeof AuthenticatedStrategiIndexRoute
   '/aksi/distribusi-news/$id': typeof AuthenticatedAksiDistribusiNewsIdRoute
   '/aksi/distribusi-sosial/$id': typeof AuthenticatedAksiDistribusiSosialIdRoute
@@ -277,6 +285,7 @@ export interface FileRoutesByTo {
   '/administrasi': typeof AuthenticatedAdministrasiIndexRoute
   '/aksi': typeof AuthenticatedAksiIndexRoute
   '/situasi': typeof AuthenticatedSituasiIndexRoute
+  '/situasi/sumber-data': typeof AuthenticatedSituasiSumberDataRoute
   '/strategi': typeof AuthenticatedStrategiIndexRoute
   '/aksi/distribusi-news/$id': typeof AuthenticatedAksiDistribusiNewsIdRoute
   '/aksi/distribusi-sosial/$id': typeof AuthenticatedAksiDistribusiSosialIdRoute
@@ -313,6 +322,7 @@ export interface FileRoutesById {
   '/_authenticated/administrasi/': typeof AuthenticatedAdministrasiIndexRoute
   '/_authenticated/aksi/': typeof AuthenticatedAksiIndexRoute
   '/_authenticated/situasi/': typeof AuthenticatedSituasiIndexRoute
+  '/_authenticated/situasi/sumber-data': typeof AuthenticatedSituasiSumberDataRoute
   '/_authenticated/strategi/': typeof AuthenticatedStrategiIndexRoute
   '/_authenticated/aksi/distribusi-news/$id': typeof AuthenticatedAksiDistribusiNewsIdRoute
   '/_authenticated/aksi/distribusi-sosial/$id': typeof AuthenticatedAksiDistribusiSosialIdRoute
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/arsip'
     | '/dampak'
     | '/situasi'
+    | '/situasi/sumber-data'
     | '/strategi'
     | '/administrasi/akun-sosial'
     | '/aksi/distribusi-news'
@@ -349,6 +360,7 @@ export interface FileRouteTypes {
     | '/administrasi/'
     | '/aksi/'
     | '/situasi/'
+    | '/situasi/sumber-data'
     | '/strategi/'
     | '/aksi/distribusi-news/$id'
     | '/aksi/distribusi-sosial/$id'
@@ -409,6 +421,7 @@ export interface FileRouteTypes {
     | '/_authenticated/administrasi/'
     | '/_authenticated/aksi/'
     | '/_authenticated/situasi/'
+    | '/_authenticated/situasi/sumber-data'
     | '/_authenticated/strategi/'
     | '/_authenticated/aksi/distribusi-news/$id'
     | '/_authenticated/aksi/distribusi-sosial/$id'
@@ -555,6 +568,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/situasi/'
       preLoaderRoute: typeof AuthenticatedSituasiIndexRouteImport
+      parentRoute: typeof AuthenticatedSituasiRoute
+    }
+    '/_authenticated/situasi/sumber-data': {
+      id: '/_authenticated/situasi/sumber-data'
+      path: '/sumber-data'
+      fullPath: '/situasi/sumber-data'
+      preLoaderRoute: typeof AuthenticatedSituasiSumberDataRouteImport
       parentRoute: typeof AuthenticatedSituasiRoute
     }
     '/_authenticated/situasi/$slug': {
@@ -802,11 +822,13 @@ const AuthenticatedSituasiSlugRouteWithChildren =
 interface AuthenticatedSituasiRouteChildren {
   AuthenticatedSituasiSlugRoute: typeof AuthenticatedSituasiSlugRouteWithChildren
   AuthenticatedSituasiIndexRoute: typeof AuthenticatedSituasiIndexRoute
+  AuthenticatedSituasiSumberDataRoute: typeof AuthenticatedSituasiSumberDataRoute
 }
 
 const AuthenticatedSituasiRouteChildren: AuthenticatedSituasiRouteChildren = {
   AuthenticatedSituasiSlugRoute: AuthenticatedSituasiSlugRouteWithChildren,
   AuthenticatedSituasiIndexRoute: AuthenticatedSituasiIndexRoute,
+  AuthenticatedSituasiSumberDataRoute: AuthenticatedSituasiSumberDataRoute,
 }
 
 const AuthenticatedSituasiRouteWithChildren =

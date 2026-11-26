@@ -1,0 +1,34 @@
+name: Situasi Apify Ingestion
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: situasi-apify-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Apify ingestion secret
+        env:
+          INGEST_SECRET: ${{ secrets.SITUASI_APIFY_INGEST_SECRET }}
+        run: |
+          if [ -z "$INGEST_SECRET" ]; then
+            echo "::error::Tambahkan SITUASI_APIFY_INGEST_SECRET pada GitHub Actions secrets."
+            exit 1
+          fi
+      - name: Run Apify ingestion pipeline
+        env:
+          INGEST_SECRET: ${{ secrets.SITUASI_APIFY_INGEST_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --max-time 120 \
+            --request POST \
+            --header "x-apify-ingest-secret: $INGEST_SECRET" \
+            --header "content-type: application/json" \
+            --data '{}' \
+            "https://kaafosgeoxcqeidtzblq.supabase.co/functions/v1/situasi-apify-ingest"

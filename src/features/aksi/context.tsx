@@ -165,6 +165,7 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   const [databaseReady, setDatabaseReady] = useState(false);
   const [campaignsRelationalReady, setCampaignsRelationalReady] = useState(false);
   const campaignSyncInFlight = useRef(false);
+  const pendingCampaignSync = useRef<{ campaigns: Campaign[]; accounts: SocialAccount[] } | null>(null);
   const productionsRef = useRef(productions);
   const databaseReadyRef = useRef(databaseReady);
   const activeLumaPolls = useRef(new Set<string>());
@@ -253,15 +254,32 @@ export function AksiProvider({ children }: { children: ReactNode }) {
   // Keep relational parent/target/post/approval/history records in sync with campaign edits.
   // Demo seed records are intentionally excluded by the repository.
   useEffect(() => {
-    if (!campaignsRelationalReady || campaignSyncInFlight.current) return;
+    if (!campaignsRelationalReady) return;
+
+    // Always retain the newest state, even while an earlier write is in flight.
+    pendingCampaignSync.current = { campaigns, accounts };
+    if (campaignSyncInFlight.current) return;
+
     const timer = setTimeout(() => {
+      if (campaignSyncInFlight.current) return;
       campaignSyncInFlight.current = true;
-      void persistSocialCampaigns(campaigns, accounts)
-        .catch((error: unknown) => {
+
+      void (async () => {
+        try {
+          // Drain every change that arrived during a previous request in order.
+          while (pendingCampaignSync.current) {
+            const latest = pendingCampaignSync.current;
+            pendingCampaignSync.current = null;
+            await persistSocialCampaigns(latest.campaigns, latest.accounts);
+          }
+        } catch (error: unknown) {
           console.error("[Distribusi Sosial] Gagal menyimpan kampanye relasional.", error);
-        })
-        .finally(() => { campaignSyncInFlight.current = false; });
+        } finally {
+          campaignSyncInFlight.current = false;
+        }
+      })();
     }, 500);
+
     return () => clearTimeout(timer);
   }, [campaigns, accounts, campaignsRelationalReady]);
 

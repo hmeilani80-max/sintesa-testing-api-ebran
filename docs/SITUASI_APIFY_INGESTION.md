@@ -22,7 +22,6 @@ This pipeline collects public web evidence for three configurable categories: ne
   }
   ```
   Each category accepts either one Actor object or an array of Actor objects. The example input keys are illustrative only. Replace them with the exact input schema required by each selected Actor. You can use multiple social Actors to cover multiple public platforms.
-  The sample input keys are illustrative only. Replace them with the exact input schema required by each selected Actor.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 100, hard maximum 500).
 - Optional `APIFY_MAX_TOTAL_CHARGE_USD`: per Actor run spend ceiling (default USD 2, hard maximum USD 25).

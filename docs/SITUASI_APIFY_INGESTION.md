@@ -30,7 +30,7 @@ This pipeline collects public web evidence for three configurable categories: ne
     ]
   }
   ```
-  A category accepts one Actor object or an array. The example social Actor and its input schema are placeholders; use the exact field names required by the Actor you select. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
+  A category accepts one Actor object or an array. The example social Actor and its input schema are placeholders; use the exact field names required by the Actor you select. Actor IDs may be written as Apify Store `owner/actor` slugs; the backend converts them to the API's `owner~actor` form. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 100, hard maximum 500).
 - Optional `APIFY_MAX_TOTAL_CHARGE_USD`: per Actor run spend ceiling (default USD 0.50, hard maximum USD 25).

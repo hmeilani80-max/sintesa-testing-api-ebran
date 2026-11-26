@@ -174,7 +174,7 @@ async function consumeDataset(
           source_category: category,
           source_name: item.sourceName,
           actor_id: actorId,
-          actor_run_id: run.id,
+          actor_run_id: run.apifyRunId ?? run.actor_run_id ?? null,
           province: item.province,
           region: item.region,
           matching_method: "existing_finding_keywords",
@@ -205,9 +205,20 @@ async function processCategory(
     }, "return=representation") as Record<string, unknown>[];
     log = created?.[0];
     if (!log?.id) throw new Error(`Tidak dapat membuat log ingestion untuk ${category}`);
-    const started = await apify(apifyToken,
-      `actors/${encodeURIComponent(config.actorId)}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
-      "POST", config.input) as Record<string, unknown>;
+    let started: Record<string, unknown>;
+    try {
+      started = await apify(apifyToken,
+        `actors/${encodeURIComponent(config.actorId)}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
+        "POST", config.input) as Record<string, unknown>;
+    } catch (error) {
+      await updateRun(base, serviceKey, String(log.id), {
+        status: "failed",
+        finished_at: new Date().toISOString(),
+        errors: [{ message: error instanceof Error ? error.message : "Actor gagal dimulai" }],
+        metadata: { phase: "start_failed" },
+      });
+      throw error;
+    }
     await updateRun(base, serviceKey, String(log.id), {
       actor_run_id: started.id ?? null,
       dataset_id: started.defaultDatasetId ?? null,
@@ -218,7 +229,7 @@ async function processCategory(
       return { category, status: "running", actorRunId: started.id, message: "Actor masih berjalan; pengambilan dataset dilanjutkan pada pemanggilan berikutnya." };
     }
     if (started.status !== "SUCCEEDED") throw new Error(`Actor berakhir dengan status ${String(started.status ?? "unknown")}`);
-    const result = await consumeDataset(base, serviceKey, apifyToken, { ...started, id: log.id }, category, config.actorId, topics, maxItems);
+    const result = await consumeDataset(base, serviceKey, apifyToken, { ...started, id: log.id, apifyRunId: started.id }, category, config.actorId, topics, maxItems);
     const status = result.errors.length ? "partial" : "success";
     await updateRun(base, serviceKey, String(log.id), {
       status, finished_at: new Date().toISOString(), dataset_id: result.datasetId,
@@ -242,7 +253,7 @@ async function processCategory(
     });
     return { category, status: "failed", actorStatus };
   }
-  const result = await consumeDataset(base, serviceKey, apifyToken, { ...actorRun, id: log.id }, category, config.actorId, topics, maxItems);
+  const result = await consumeDataset(base, serviceKey, apifyToken, { ...actorRun, id: log.id, apifyRunId: log.actor_run_id }, category, config.actorId, topics, maxItems);
   const status = result.errors.length ? "partial" : "success";
   await updateRun(base, serviceKey, String(log.id), {
     status, finished_at: new Date().toISOString(), dataset_id: result.datasetId,

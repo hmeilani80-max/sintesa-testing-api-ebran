@@ -146,7 +146,7 @@ function RiskForecast() {
         <Panel title="Early Warning" action={<RadioTower className="size-4 text-destructive" />}><div className="divide-y divide-border">{profile.warnings.map((warning) => <div key={warning.title} className="flex items-start gap-3 py-3"><AlertTriangle className={warning.level === "TINGGI" ? "mt-0.5 size-4 text-destructive" : "mt-0.5 size-4 text-chart-3"} /><div className="flex-1"><p className="text-xs font-medium">{warning.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{warning.meta}</p></div><span className="text-[9px] font-semibold">{warning.level}</span></div>)}</div></Panel>
       </div>
 
-      <Panel title="Pola Aktivitas Tidak Biasa" action={<Button variant="outline" size="sm" onClick={() => choose("Indikasi aktivitas terkoordinasi")}>Lihat Detail<ArrowUpRight /></Button>}><p className="text-sm">{profile.unusualActivity}</p><p className="mt-2 text-xs text-muted-foreground">Analisis pola hanya ditampilkan jika didukung observasi yang cukup dan dapat ditelusuri.</p></Panel>
+      <Panel title="Metode Perhitungan Risiko" action={<Button variant="outline" size="sm" onClick={() => choose("Indikasi aktivitas terkoordinasi")}>Lihat Detail<ArrowUpRight /></Button>}><p className="text-sm">{profile.unusualActivity}</p><p className="mt-2 text-xs text-muted-foreground">Komponen skor: pertumbuhan observasi 35%, jumlah aktor 20%, cakupan wilayah 20%, dan sentimen negatif 25%. Sistem tidak menyimpulkan koordinasi atau manipulasi tanpa bukti terverifikasi.</p></Panel>
 
       <Panel title="Riwayat Peringatan & Penanganan" description="Linimasa peringatan dan status penanganan dari sistem hingga respons operasional">
         <ol className="space-y-4 border-l border-border pl-5">

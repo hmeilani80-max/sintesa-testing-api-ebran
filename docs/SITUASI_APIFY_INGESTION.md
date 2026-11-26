@@ -96,24 +96,142 @@ This pipeline collects public web evidence for three configurable categories: ne
         "input": {
           "startUrls": [
             {
-              "url": "https://REPLACE_WITH_OFFICIAL_NATIONAL_GOV_DOMAIN.go.id"
+              "url": "https://www.indonesia.go.id"
             },
             {
-              "url": "https://REPLACE_WITH_OFFICIAL_PROVINCE_01_DOMAIN.go.id"
+              "url": "https://setkab.go.id"
             },
             {
-              "url": "https://REPLACE_WITH_OFFICIAL_PROVINCE_02_DOMAIN.go.id"
+              "url": "https://www.kemendagri.go.id"
+            },
+            {
+              "url": "https://www.bnpb.go.id"
+            },
+            {
+              "url": "https://acehprov.go.id"
+            },
+            {
+              "url": "https://sumutprov.go.id"
+            },
+            {
+              "url": "https://sumbarprov.go.id"
+            },
+            {
+              "url": "https://riau.go.id"
+            },
+            {
+              "url": "https://jambiprov.go.id"
+            },
+            {
+              "url": "https://sumselprov.go.id"
+            },
+            {
+              "url": "https://bengkuluprov.go.id"
+            },
+            {
+              "url": "https://lampungprov.go.id"
+            },
+            {
+              "url": "https://babelprov.go.id"
+            },
+            {
+              "url": "https://kepriprov.go.id"
+            },
+            {
+              "url": "https://jakarta.go.id"
+            },
+            {
+              "url": "https://jabarprov.go.id"
+            },
+            {
+              "url": "https://jatengprov.go.id"
+            },
+            {
+              "url": "https://jogjaprov.go.id"
+            },
+            {
+              "url": "https://jatimprov.go.id"
+            },
+            {
+              "url": "https://bantenprov.go.id"
+            },
+            {
+              "url": "https://baliprov.go.id"
+            },
+            {
+              "url": "https://ntbprov.go.id"
+            },
+            {
+              "url": "https://nttprov.go.id"
+            },
+            {
+              "url": "https://kalbarprov.go.id"
+            },
+            {
+              "url": "https://kalteng.go.id"
+            },
+            {
+              "url": "https://kalselprov.go.id"
+            },
+            {
+              "url": "https://kaltimprov.go.id"
+            },
+            {
+              "url": "https://kaltaraprov.go.id"
+            },
+            {
+              "url": "https://sulutprov.go.id"
+            },
+            {
+              "url": "https://sultengprov.go.id"
+            },
+            {
+              "url": "https://sulselprov.go.id"
+            },
+            {
+              "url": "https://sulawesitenggaraprov.go.id"
+            },
+            {
+              "url": "https://gorontaloprov.go.id"
+            },
+            {
+              "url": "https://sulbarprov.go.id"
+            },
+            {
+              "url": "https://malukuprov.go.id"
+            },
+            {
+              "url": "https://malutprov.go.id"
+            },
+            {
+              "url": "https://papuabaratprov.go.id"
+            },
+            {
+              "url": "https://papua.go.id"
+            },
+            {
+              "url": "https://papuaselatan.go.id"
+            },
+            {
+              "url": "https://papuatengahprov.go.id"
+            },
+            {
+              "url": "https://papuapegunungan.go.id"
+            },
+            {
+              "url": "https://papuabaratdayaprov.go.id"
             }
           ],
           "maxCrawlDepth": 1,
-          "maxCrawlPages": 30,
+          "maxCrawlPages": 100,
           "respectRobotsTxtFile": true
         }
       }
     ]
   }
   ```
-  **Wajib disesuaikan sebelum dijalankan:** ganti URL halaman Facebook, username kanal Telegram, dan seluruh URL pemerintah dengan sumber resmi yang benar-benar dipantau. Untuk cakupan seluruh Indonesia, masukkan portal nasional dan domain resmi seluruh 38 provinsi pada `government.input.startUrls`. Actor Facebook hanya mengambil halaman publik yang dicantumkan. Instagram pada contoh ini menggunakan hashtag publik `#Indonesia`; ganti/duplikasi Actor config bila ingin memantau hashtag lain. Actor TikTok, X, YouTube, dan Google News mendukung perluasan kata kunci dari temuan Situasi melalui `queryField`.
+  **Sumber yang perlu diganti sebelum dijalankan:** ganti URL halaman Facebook dan username kanal Telegram dengan akun publik resmi yang dipantau. Konfigurasi pemerintah sudah memuat portal nasional dan 38 domain pemerintah provinsi; tinjau kembali setiap portal bila pemerintah daerah mengubah domainnya. Instagram memakai hashtag publik `#Indonesia` sebagai titik awal. Actor TikTok, X, YouTube, dan Google News mengembangkan pencarian berdasarkan temuan Situasi untuk nasional dan 38 provinsi.
+  **Wajib disesuaikan sebelum dijalankan:** ganti URL halaman Facebook, username kanal Telegram, dan seluruh URL pemerintah dengan sumber resmi yang benar-benar dipantau. Actor Facebook hanya mengambil halaman publik yang dicantumkan. Instagram pada contoh ini menggunakan hashtag publik `#Indonesia`; ganti/duplikasi Actor config bila ingin memantau hashtag lain. Actor TikTok, X, YouTube, dan Google News mendukung perluasan kata kunci dari temuan Situasi melalui `queryField`.
   A category accepts one Actor object or an array. Actor IDs may be written as Apify Store `owner/actor` slugs; the backend converts them to the API's `owner~actor` form. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 30, hard maximum 500).
@@ -126,7 +244,7 @@ Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the
 - The pipeline reads the existing `situasi_system_findings`; when `queryField` is configured it expands those topic names and up to two keywords into nationwide plus 38 province-specific queries. It matches only explicit existing finding names/keywords.
 - All normalized items are retained in `situasi_apify_items`, including unmatched items, for analyst review.
 - Only items with a valid source URL, a parseable published timestamp, and an existing topic match are promoted to `situasi_observations`.
-- Province/region fields are copied only when present in Actor output; the pipeline does not infer a location. Government Actors must be given official provincial start URLs in their own `input.startUrls` configuration.
+- Province/region fields are copied only when present in Actor output; the pipeline does not infer a location. The provided government Actor configuration seeds the national portal and 38 provincial government domains; review domain changes periodically.
 - Sentiment and risk are not fabricated by the collector. The existing EWS database trigger computes risk only from its evidence rules.
 - Deduplication uses a SHA-256 item hash for raw items and source URL for promoted Apify observations.
 - Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds.
@@ -139,3 +257,7 @@ GitHub Actions runs every 3 hours and supports manual dispatch:
 `https://github.com/hmeilani80-max/sintesa-testing-api-ebran/actions/workflows/situasi-apify-ingestion.yml`
 
 The authenticated Situasi > Sumber Data page reads run history and collected items from Supabase.
+
+
+## Official provincial portal references
+The 38 provincial portal domains in the example were cross-checked against the government provincial website directory published by the Directorate General of Livestock and Animal Health, Ministry of Agriculture, and the Ombudsman RI provincial government link directory. See https://bptusembawa.ditjenpkh.pertanian.go.id/informasi/pemerintah-provinsi/ and https://ombudsman.go.id/linkdir/link_list?cat_id=4.

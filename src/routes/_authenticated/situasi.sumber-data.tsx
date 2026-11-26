@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Activity, ArrowLeft, ExternalLink, Newspaper, Radio, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
@@ -69,7 +69,7 @@ function SituationSources() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const [runResult, itemResult] = await Promise.all([
       db.from("situasi_apify_ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
@@ -83,7 +83,7 @@ function SituationSources() {
       setItems((itemResult.data ?? []) as ItemRow[]);
     }
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     void load();
@@ -92,7 +92,7 @@ function SituationSources() {
       .on("postgres_changes", { event: "*", schema: "public", table: "situasi_apify_items" }, () => { void load(); })
       .subscribe();
     return () => { void db.removeChannel(channel); };
-  }, []);
+  }, [load]);
 
   const totals = runs.reduce((acc, run) => ({
     runs: acc.runs + 1,

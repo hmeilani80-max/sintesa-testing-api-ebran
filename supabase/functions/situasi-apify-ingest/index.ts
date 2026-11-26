@@ -91,19 +91,19 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
     ? item.metadata as Record<string, unknown> : {};
   const title = firstString(item, ["title", "headline", "name", "postTitle", "pageTitle"]) ??
     firstString(nestedMetadata, ["title", "headline", "og:title", "pageTitle"]) ?? "";
-  const content = firstString(item, ["text", "content", "description", "fullText", "caption", "body", "summary", "markdown"]) ??
+  const content = firstString(item, ["text", "content", "description", "fullText", "caption", "body", "summary", "markdown", "transcript"]) ??
     firstString(nestedMetadata, ["description", "og:description"]) ?? title;
   if (!content.trim()) return null;
-  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "timestamp", "time"]) ??
+  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "createdTime", "created_time", "createTime", "takenAtTimestamp", "timestamp", "time"]) ??
     firstString(nestedMetadata, ["publishedTime", "datePublished", "published_at", "date", "lastModified", "article:published_time"]);
-  const date = rawDate ? new Date(rawDate) : null;
+  const numericDate = rawDate && /^\\d{10,13}$/.test(rawDate) ? Number(rawDate) : null;\n  const date = rawDate ? new Date(numericDate ? (rawDate.length === 10 ? numericDate * 1000 : numericDate) : rawDate) : null;
   const publishedAt = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
   const platform = firstString(item, ["platform", "socialNetwork", "network"]) ??
     (category === "news" ? "News" : category === "social" ? "Media Sosial" : "Situs Pemerintah");
   return {
     title: title || content.slice(0, 240),
     content: content.slice(0, 12000),
-    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "canonicalUrl"]) ??
+    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
       firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
@@ -112,7 +112,7 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
     province: firstString(item, ["province", "provinsi"]) ?? firstString(nestedMetadata, ["province", "provinsi"]),
     region: firstString(item, ["region", "location", "locationName", "city"]) ??
       firstString(nestedMetadata, ["region", "location", "city"]),
-    actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName"]),
+    actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName", "ownerUsername"]),
   };
 }
 
@@ -337,7 +337,7 @@ Deno.serve(async (req: Request) => {
   if (!configured.length) return json({ error: "Belum ada Actor news/social/government di APIFY_SITUASI_ACTORS" }, 503);
 
   const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "100") || 100));
-  const maxCost = Math.min(25, Math.max(0.1, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "2") || 2));
+  const maxCost = Math.min(25, Math.max(0.1, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.5") || 0.5));
   const base = supabaseUrl.replace(/\/$/, "");
   try {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];

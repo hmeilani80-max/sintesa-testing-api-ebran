@@ -125,12 +125,12 @@ function SituationSources() {
             <CardDescription>Token dan konfigurasi Actor hanya disimpan sebagai Supabase Edge Function Secrets, tidak pernah di browser atau database publik.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border p-4"><Newspaper className="mb-2 size-5" /><p className="font-medium">Berita online</p><p className="mt-1 text-xs text-muted-foreground">Actor kategori news</p></div>
-            <div className="rounded-lg border p-4"><Radio className="mb-2 size-5" /><p className="font-medium">Media sosial</p><p className="mt-1 text-xs text-muted-foreground">Actor kategori social</p></div>
-            <div className="rounded-lg border p-4"><Activity className="mb-2 size-5" /><p className="font-medium">Situs pemerintah</p><p className="mt-1 text-xs text-muted-foreground">Actor kategori government</p></div>
+            <div className="rounded-lg border p-4"><Newspaper className="mb-2 size-5" /><p className="font-medium">Berita online</p><p className="mt-1 text-xs text-muted-foreground">Google News / berita online</p></div>
+            <div className="rounded-lg border p-4"><Radio className="mb-2 size-5" /><p className="font-medium">Media sosial</p><p className="mt-1 text-xs text-muted-foreground">Instagram · TikTok · Facebook · X · YouTube · Telegram</p></div>
+            <div className="rounded-lg border p-4"><Activity className="mb-2 size-5" /><p className="font-medium">Situs pemerintah</p><p className="mt-1 text-xs text-muted-foreground">Portal nasional + situs resmi provinsi</p></div>
           </CardContent>
           <CardContent className="border-t pt-4 text-sm text-muted-foreground">
-            Cakupan target: Indonesia nasional dan seluruh provinsi. Lokasi hanya dicatat jika Actor mengembalikan informasi provinsi/wilayah yang eksplisit. Jadwal otomatis setiap 30 menit setelah secret dan Actor dikonfigurasi.
+            Cakupan target: Indonesia nasional dan 38 provinsi. Kata kunci temuan diperluas untuk Actor yang mendukung pencarian berbasis daftar; portal pemerintah, halaman Facebook, dan kanal Telegram harus diisi dengan URL/username publik resmi. Lokasi hanya dicatat jika sumber mengembalikan informasi wilayah secara eksplisit. Jadwal otomatis setiap 3 jam setelah secret dan Actor dikonfigurasi.
           </CardContent>
         </Card>
 

@@ -144,8 +144,8 @@ export function SituationProvider({
   const [databaseFindings, setDatabaseFindings] =
     useState<SituationEntry[]>([]);
 
-  // Temuan Sistem dibaca dari tabel relasional khusus. Data statis
-  // tetap menjadi fallback agar layar tidak kosong saat database gagal.
+  // Temuan Sistem selalu dibaca dari Supabase. Jika database gagal atau kosong,
+  // tampilkan kondisi kosong agar data contoh tidak disamarkan sebagai temuan aktual.
   useEffect(() => {
     let cancelled = false;
 
@@ -179,24 +179,24 @@ export function SituationProvider({
           slug: row.slug,
           name: row.name,
           source: "Temuan Sistem" as const,
-          risk: (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah" || row.risk === "Kritis"
+          risk: row.data_quality === "sufficient" && (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah" || row.risk === "Kritis")
             ? row.risk
-            : undefined),
+            : undefined,
           status: row.status,
-          volume: formatCount(row.volume),
-          actors: formatCount(row.actor_count),
-          narratives: formatCount(row.narrative_count),
+          volume: row.data_quality === "sufficient" ? formatCount(row.volume) : "—",
+          actors: row.data_quality === "sufficient" ? formatCount(row.actor_count) : "—",
+          narratives: row.data_quality === "sufficient" ? formatCount(row.narrative_count) : "—",
           since: row.since_label,
           description: row.description,
           platforms: row.platforms ?? [],
           regionScope: row.region_scope,
           keywords: row.keywords ?? [],
-          detectedReason: row.detected_reason ?? undefined,
-          triggers: row.triggers ?? [],
-          growth: row.growth ?? undefined,
-          regionsGrowing: row.regions_growing ?? undefined,
-          dominantNarrative: row.dominant_narrative ?? undefined,
-          warningStatus: row.warning_status ?? undefined,
+          detectedReason: row.data_quality === "sufficient" ? row.detected_reason ?? undefined : undefined,
+          triggers: row.data_quality === "sufficient" ? row.triggers ?? [] : [],
+          growth: row.data_quality === "sufficient" ? row.growth ?? undefined : undefined,
+          regionsGrowing: row.data_quality === "sufficient" ? row.regions_growing ?? undefined : undefined,
+          dominantNarrative: row.data_quality === "sufficient" ? row.dominant_narrative ?? undefined : undefined,
+          warningStatus: row.data_quality === "sufficient" ? row.warning_status ?? undefined : "Data belum cukup",
           riskScore: row.risk_score ?? undefined,
           dataQuality: row.data_quality ?? "insufficient",
           evidenceCount: row.evidence_count ?? 0,

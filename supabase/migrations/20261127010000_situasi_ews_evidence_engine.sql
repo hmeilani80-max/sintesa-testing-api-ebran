@@ -89,12 +89,12 @@ begin
          max(observed_at)
     into v_recent,v_previous,v_actors,v_regions,v_negative,v_last
     from public.situasi_observations
-   where topic_slug=p_topic_slug and observed_at>=now()-interval '14 days';
+   where topic_slug=p_topic_slug;
 
   if v_last>=now()-interval '7 days' and v_recent>=5 then v_quality:='sufficient'; end if;
 
   if v_quality='insufficient' then
-    update public.situasi_system_findings set risk_score=null,data_quality='insufficient',
+    update public.situasi_system_findings set risk=null,warning_status='Data belum cukup',risk_score=null,data_quality='insufficient',
       evidence_count=v_recent,last_observed_at=v_last,updated_at=now() where slug=p_topic_slug;
     update public.situasi_ews set risk_score=null,data_quality='insufficient',evidence_count=v_recent,
       last_observed_at=v_last,last_calculated_at=now(),updated_at=now(),

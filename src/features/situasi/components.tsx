@@ -82,7 +82,7 @@ export function SummaryBlock({ title, copy, highlights }: { title: string; copy:
 }
 
 export function RiskLabel({ value }: { value: string }) {
-  return <span className={cn("inline-flex rounded-sm px-2 py-1 text-[10px] font-semibold", value === "Tinggi" ? "bg-destructive/15 text-destructive" : value === "Sedang" ? "bg-chart-3/15 text-chart-3" : "bg-chart-2/15 text-chart-2")}>{value}</span>;
+  return <span className={cn("inline-flex rounded-sm px-2 py-1 text-[10px] font-semibold", value === "Kritis" ? "bg-destructive text-destructive-foreground" : value === "Tinggi" ? "bg-destructive/15 text-destructive" : value === "Sedang" ? "bg-chart-3/15 text-chart-3" : "bg-chart-2/15 text-chart-2")}>{value}</span>;
 }
 
 export function DetailTable({ rows, onSelect }: { rows: DetailRecord[]; onSelect: (row: DetailRecord) => void }) {

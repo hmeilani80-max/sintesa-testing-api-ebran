@@ -130,7 +130,7 @@ function SituationCatalogue() {
     setDialogOpen(false);
   }
 
-  return <PageShell eyebrow="See" title="Situasi" description="Pantau temuan sistem dan topik strategis yang sedang dipantau." actions={<FilterBar />}>
+  return <PageShell eyebrow="See" title="Situasi" description="Pantau temuan sistem dan topik strategis yang sedang dipantau." actions={<div className="flex flex-wrap items-center gap-2"><Button asChild size="sm" variant="outline"><Link to="/situasi/sumber-data">Sumber Data</Link></Button><FilterBar /></div>}>
     <div className="space-y-10">
       <section aria-labelledby="ews-title">
         <div className="mb-5 flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-md bg-destructive/10 text-destructive"><RadioTower className="size-4" /></span><div><h2 id="ews-title" className="text-lg font-semibold">EWS / Temuan Sistem</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Situasi yang terdeteksi otomatis berdasarkan lonjakan aktivitas, perubahan pola, risiko, atau indikator tidak biasa.</p></div></div>

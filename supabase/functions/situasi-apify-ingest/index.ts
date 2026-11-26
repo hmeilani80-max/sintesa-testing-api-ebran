@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 type Category = "news" | "social" | "government";
-type ActorConfig = { actorId: string; input: Record<string, unknown> };
+type ActorConfig = { actorId: string; input: Record<string, unknown>; queryField?: string };
 type Topic = { slug: string; name: string; keywords: string[] | null };
 type NormalizedItem = {
   title: string;
@@ -16,6 +16,16 @@ type NormalizedItem = {
 };
 
 const CATEGORIES: Category[] = ["news", "social", "government"];
+const INDONESIA_PROVINCES = [
+  "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Jambi", "Sumatera Selatan",
+  "Bengkulu", "Lampung", "Kepulauan Bangka Belitung", "Kepulauan Riau", "DKI Jakarta",
+  "Jawa Barat", "Jawa Tengah", "DI Yogyakarta", "Jawa Timur", "Banten", "Bali",
+  "Nusa Tenggara Barat", "Nusa Tenggara Timur", "Kalimantan Barat", "Kalimantan Tengah",
+  "Kalimantan Selatan", "Kalimantan Timur", "Kalimantan Utara", "Sulawesi Utara",
+  "Sulawesi Tengah", "Sulawesi Selatan", "Sulawesi Tenggara", "Gorontalo", "Sulawesi Barat",
+  "Maluku", "Maluku Utara", "Papua", "Papua Barat", "Papua Selatan", "Papua Tengah",
+  "Papua Pegunungan", "Papua Barat Daya",
+];
 const corsHeaders = {
   "Access-Control-Allow-Origin": "https://sintesa-testing-api-ebran.vercel.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-apify-ingest-secret",
@@ -103,6 +113,25 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
     region: firstString(item, ["region", "location", "locationName", "city"]) ??
       firstString(nestedMetadata, ["region", "location", "city"]),
     actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName"]),
+  };
+}
+
+function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, unknown> {
+  if (!config.queryField) return config.input;
+  const fieldName = config.queryField.trim();
+  if (!fieldName) return config.input;
+  const existing = Array.isArray(config.input[fieldName])
+    ? (config.input[fieldName] as unknown[]).filter((value): value is string => typeof value === "string")
+    : [];
+  const terms = [...new Set(topics.flatMap((topic) => [
+    topic.name,
+    ...(topic.keywords ?? []).slice(0, 2),
+  ]).map((term) => term.trim()).filter(Boolean))].slice(0, 20);
+  const nationwideQueries = terms.map((term) => `${term} Indonesia`);
+  const provinceQueries = terms.flatMap((term) => INDONESIA_PROVINCES.map((province) => `${term} ${province}`));
+  return {
+    ...config.input,
+    [fieldName]: [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 500),
   };
 }
 
@@ -210,7 +239,7 @@ async function processCategory(
   if (!log) {
     const created = await rest(base, serviceKey, "situasi_apify_ingestion_runs", "POST", {
       source_category: category, actor_id: config.actorId, status: "running",
-      metadata: { phase: "starting", max_items: maxItems, max_total_charge_usd: maxCost },
+      metadata: { phase: "starting", max_items: maxItems, max_total_charge_usd: maxCost, query_field: config.queryField ?? null, province_targets: config.queryField ? INDONESIA_PROVINCES.length : null },
     }, "return=representation") as Record<string, unknown>[];
     log = created?.[0];
     if (!log?.id) throw new Error(`Tidak dapat membuat log ingestion untuk ${category}`);
@@ -218,7 +247,7 @@ async function processCategory(
     try {
       started = await apify(apifyToken,
         `actors/${encodeURIComponent(config.actorId)}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
-        "POST", config.input) as Record<string, unknown>;
+        "POST", buildActorInput(config, topics)) as Record<string, unknown>;
     } catch (error) {
       await updateRun(base, serviceKey, String(log.id), {
         status: "failed",

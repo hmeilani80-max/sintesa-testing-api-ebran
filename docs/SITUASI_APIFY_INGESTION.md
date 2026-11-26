@@ -8,11 +8,20 @@ This pipeline collects public web evidence for three configurable categories: ne
 - `APIFY_SITUASI_ACTORS`: JSON object with one or more category configs:
   ```json
   {
-    "news": { "actorId": "username~news-actor", "input": { "searchStringsArray": ["berita Indonesia"] } },
-    "social": { "actorId": "username~social-actor", "input": { "searchTerms": ["Indonesia"] } },
-    "government": { "actorId": "username~website-actor", "input": { "startUrls": [{ "url": "https://www.go.id" }] } }
+    "news": [
+      { "actorId": "username~news-actor", "input": { "keywords": ["Indonesia"], "languages": ["id"], "maxArticles": 100 } }
+    ],
+    "social": [
+      { "actorId": "username~instagram-actor", "input": { "search": ["Indonesia"] } },
+      { "actorId": "username~tiktok-actor", "input": { "searchQueries": ["Indonesia"] } },
+      { "actorId": "username~x-actor", "input": { "searchTerms": ["Indonesia"] } }
+    ],
+    "government": [
+      { "actorId": "username~website-actor", "input": { "startUrls": [{ "url": "https://www.go.id" }] } }
+    ]
   }
   ```
+  Each category accepts either one Actor object or an array of Actor objects. The example input keys are illustrative only. Replace them with the exact input schema required by each selected Actor. You can use multiple social Actors to cover multiple public platforms.
   The sample input keys are illustrative only. Replace them with the exact input schema required by each selected Actor.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 100, hard maximum 500).
@@ -31,7 +40,7 @@ Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the
 - Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds.
 
 ## Actor selection
-Choose Actors in Apify Store that you are licensed and permitted to use. Confirm their current input schema, output fields, platform terms, rate limits, and pricing before adding them to `APIFY_SITUASI_ACTORS`. Avoid private-account scraping, login bypass, or collection of sensitive personal data.
+Choose Actors in Apify Store that you are licensed and permitted to use. Confirm their current input schema, output fields, platform terms, rate limits, and pricing before adding them to `APIFY_SITUASI_ACTORS`. For national and all-province coverage, include countrywide searches and province-specific search terms or official provincial URLs in each Actor's own input. Avoid private-account scraping, login bypass, or collection of sensitive personal data.
 
 ## Trigger and monitoring
 GitHub Actions runs every 30 minutes and supports manual dispatch:

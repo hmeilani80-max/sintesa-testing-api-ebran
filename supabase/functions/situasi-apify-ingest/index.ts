@@ -111,7 +111,7 @@ function normalizeItem(raw: unknown, category: Category, platformOverride?: stri
       firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
-    sourceName: firstString(item, ["sourceName", "publisher", "siteName", "website", "domain", "channelTitle", "channel", "channelName", "pageName"]) ??
+    sourceName: firstString(item, ["sourceName", "publisher", "source", "siteName", "website", "domain", "channelTitle", "channel", "channelName", "pageName", "source.title", "source.name", "publisher.name"]) ??
       firstString(nestedMetadata, ["siteName", "og:site_name", "publisher"]),
     province: firstString(item, ["province", "provinsi"]) ?? firstString(nestedMetadata, ["province", "provinsi"]),
     region: firstString(item, ["region", "location", "locationName", "city"]) ??

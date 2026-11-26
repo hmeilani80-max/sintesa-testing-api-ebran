@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 type Category = "news" | "social" | "government";
-type ActorConfig = { actorId: string; input: Record<string, unknown>; queryField?: string; platform?: string };
+type ActorConfig = { actorId: string; input: Record<string, unknown>; queryField?: string; platform?: string; maxQueries?: number };
 type Topic = { slug: string; name: string; keywords: string[] | null };
 type NormalizedItem = {
   title: string;
@@ -138,7 +138,7 @@ function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, u
   ]).map((term) => term.trim()).filter(Boolean))].slice(0, 20);
   const nationwideQueries = terms.map((term) => `${term} Indonesia`);
   const provinceQueries = terms.flatMap((term) => INDONESIA_PROVINCES.map((province) => `${term} ${province}`));
-  const expanded = [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 1000);
+  const expanded = [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, Math.min(1000, Math.max(1, config.maxQueries ?? 100)));
   const configuredValue = config.input[fieldName];
   // Most search Actors accept arrays; Google SERP-style Actors accept one query string.
   const queryValue = Array.isArray(configuredValue) || configuredValue === undefined
@@ -347,7 +347,7 @@ Deno.serve(async (req: Request) => {
       !!(value as ActorConfig).input && typeof (value as ActorConfig).input === "object" &&
       !Array.isArray((value as ActorConfig).input) &&
       ((value as ActorConfig).queryField === undefined || typeof (value as ActorConfig).queryField === "string") &&
-      ((value as ActorConfig).platform === undefined || typeof (value as ActorConfig).platform === "string")
+      ((value as ActorConfig).platform === undefined || typeof (value as ActorConfig).platform === "string") &&\n      ((value as ActorConfig).maxQueries === undefined || Number.isInteger((value as ActorConfig).maxQueries))
     );
   }
   const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);

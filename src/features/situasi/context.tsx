@@ -13,7 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
   monitoredTopics,
-  systemFindings,
   type SituationEntry,
 } from "./data";
 
@@ -143,7 +142,7 @@ export function SituationProvider({
     createdTopics: [] as SituationEntry[],
   });
   const [databaseFindings, setDatabaseFindings] =
-    useState<SituationEntry[]>(systemFindings);
+    useState<SituationEntry[]>([]);
 
   // Temuan Sistem dibaca dari tabel relasional khusus. Data statis
   // tetap menjadi fallback agar layar tidak kosong saat database gagal.
@@ -163,13 +162,12 @@ export function SituationProvider({
           "[Situasi] Gagal memuat Temuan Sistem dari database:",
           error.message,
         );
+        setDatabaseFindings([]);
         return;
       }
 
       if (!data?.length) {
-        console.warn(
-          "[Situasi] Tabel situasi_system_findings kosong; memakai data fallback.",
-        );
+        setDatabaseFindings([]);
         return;
       }
 
@@ -199,6 +197,10 @@ export function SituationProvider({
           regionsGrowing: row.regions_growing ?? undefined,
           dominantNarrative: row.dominant_narrative ?? undefined,
           warningStatus: row.warning_status ?? undefined,
+          riskScore: row.risk_score ?? undefined,
+          dataQuality: row.data_quality ?? "insufficient",
+          evidenceCount: row.evidence_count ?? 0,
+          lastObservedAt: row.last_observed_at ?? undefined,
         })),
       );
     }

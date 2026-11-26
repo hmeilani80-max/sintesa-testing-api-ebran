@@ -57,7 +57,7 @@ function RiskForecast() {
     async function loadRiskData() {
       const [riskResult, trendResult, ewsResult] = await Promise.all([
         db.from("situasi_risk_profiles").select("*").eq("topic_slug", slug).maybeSingle(),
-        db.from("situasi_trend_points").select("*").eq("topic_slug", slug).order("period_date", { ascending: true }),
+        db.from("situasi_trend_points").select("*").eq("topic_slug", slug).gte("period_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)).order("period_date", { ascending: true }),
         db.from("situasi_ews").select("slug").eq("topic_slug", slug).maybeSingle(),
       ]);
       if (cancelled) return;
@@ -140,7 +140,7 @@ function RiskForecast() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-        <Panel title="Prediksi Penyebaran"><dl className="grid grid-cols-2 gap-4 text-xs">{[["Potensi Penyebaran", profile.spreadPotential], ["Platform Dominan", situation.platforms.slice(0, 3).join(", ")], ["Wilayah Berkembang", profile.growingRegions], ["Aktor Baru", profile.newActors], ["Narasi Pendorong", profile.drivingNarrative]].map(([label, value]) => <div key={label} className={label === "Narasi Pendorong" ? "col-span-2" : undefined}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl></Panel>
+        <Panel title="Prediksi Penyebaran"><dl className="grid grid-cols-2 gap-4 text-xs">{[["Potensi Penyebaran", hasRiskEvidence ? profile.spreadPotential : "Belum cukup data"], ["Platform Dominan", hasRiskEvidence ? situation.platforms.slice(0, 3).join(", ") : "—"], ["Wilayah Berkembang", hasRiskEvidence ? profile.growingRegions : "—"], ["Aktor Baru", hasRiskEvidence ? profile.newActors : "—"], ["Narasi Pendorong", hasRiskEvidence ? profile.drivingNarrative : "—"]].map(([label, value]) => <div key={label} className={label === "Narasi Pendorong" ? "col-span-2" : undefined}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl></Panel>
         <Panel title="Early Warning" action={<RadioTower className="size-4 text-destructive" />}><div className="divide-y divide-border">{profile.warnings.map((warning) => <div key={warning.title} className="flex items-start gap-3 py-3"><AlertTriangle className={warning.level === "TINGGI" ? "mt-0.5 size-4 text-destructive" : "mt-0.5 size-4 text-chart-3"} /><div className="flex-1"><p className="text-xs font-medium">{warning.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{warning.meta}</p></div><span className="text-[9px] font-semibold">{warning.level}</span></div>)}</div></Panel>
       </div>
 

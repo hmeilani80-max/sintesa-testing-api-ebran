@@ -13,6 +13,7 @@ This pipeline collects public web evidence for three configurable categories: ne
         "actorId": "mastertools/google-news-scraper",
         "platform": "google-news",
         "queryField": "queries",
+        "maxQueries": 100,
         "input": {
           "queries": [
             "Indonesia"
@@ -24,19 +25,22 @@ This pipeline collects public web evidence for three configurable categories: ne
     ],
     "social": [
       {
-        "actorId": "apify/instagram-scraper",
+        "actorId": "apify/instagram-hashtag-scraper",
         "platform": "instagram",
+        "queryField": "hashtags",
+        "maxQueries": 100,
         "input": {
+          "hashtags": [],
+          "keywordSearch": true,
           "resultsType": "posts",
-          "search": "#Indonesia",
-          "searchType": "hashtag",
-          "resultsLimit": 20
+          "resultsLimit": 5
         }
       },
       {
         "actorId": "clockworks/tiktok-scraper",
         "platform": "tiktok",
         "queryField": "searchQueries",
+        "maxQueries": 100,
         "input": {
           "searchQueries": [],
           "resultsPerPage": 5,
@@ -44,21 +48,22 @@ This pipeline collects public web evidence for three configurable categories: ne
         }
       },
       {
-        "actorId": "apify/facebook-posts-scraper",
+        "actorId": "automation_craft/facebook-search-scraper",
         "platform": "facebook",
+        "queryField": "searchQueries",
+        "maxQueries": 100,
         "input": {
-          "startUrls": [
-            {
-              "url": "https://www.facebook.com/REPLACE_WITH_PUBLIC_OFFICIAL_PAGE/"
-            }
-          ],
-          "resultsLimit": 20
+          "searchQueries": [],
+          "sortBy": "recent",
+          "maxPostsPerQuery": 5,
+          "maxPosts": 30
         }
       },
       {
         "actorId": "apidojo/twitter-scraper-lite",
         "platform": "x",
         "queryField": "searchTerms",
+        "maxQueries": 100,
         "input": {
           "searchTerms": [],
           "sort": "Latest",
@@ -70,6 +75,7 @@ This pipeline collects public web evidence for three configurable categories: ne
         "actorId": "streamers/youtube-scraper",
         "platform": "youtube",
         "queryField": "searchQueries",
+        "maxQueries": 100,
         "input": {
           "searchQueries": [],
           "maxResults": 10,
@@ -78,14 +84,15 @@ This pipeline collects public web evidence for three configurable categories: ne
         }
       },
       {
-        "actorId": "forgedata/telegram-channel-scraper",
+        "actorId": "hyperbach/telegram-keyword-search-scraper",
         "platform": "telegram",
+        "queryField": "keywords",
+        "maxQueries": 100,
         "input": {
-          "channels": [
-            "REPLACE_WITH_PUBLIC_CHANNEL_USERNAME"
-          ],
-          "maxPostsPerChannel": 20,
-          "postedWithinDays": 7
+          "keywords": [],
+          "maxResultsPerKeyword": 5,
+          "maxChannelsPerKeyword": 10,
+          "matchMode": "allWords"
         }
       }
     ],
@@ -230,8 +237,9 @@ This pipeline collects public web evidence for three configurable categories: ne
     ]
   }
   ```
-  **Sumber yang perlu diganti sebelum dijalankan:** ganti URL halaman Facebook dan username kanal Telegram dengan akun publik resmi yang dipantau. Konfigurasi pemerintah sudah memuat portal nasional dan 38 domain pemerintah provinsi; tinjau kembali setiap portal bila pemerintah daerah mengubah domainnya. Instagram memakai hashtag publik `#Indonesia` sebagai titik awal. Actor TikTok, X, YouTube, dan Google News mengembangkan pencarian berdasarkan temuan Situasi untuk nasional dan 38 provinsi.
-  **Wajib disesuaikan sebelum dijalankan:** ganti URL halaman Facebook, username kanal Telegram, dan seluruh URL pemerintah dengan sumber resmi yang benar-benar dipantau. Actor Facebook hanya mengambil halaman publik yang dicantumkan. Instagram pada contoh ini menggunakan hashtag publik `#Indonesia`; ganti/duplikasi Actor config bila ingin memantau hashtag lain. Actor TikTok, X, YouTube, dan Google News mendukung perluasan kata kunci dari temuan Situasi melalui `queryField`.
+  Konfigurasi ini memakai enam platform sosial yang bisa mencari berdasarkan kata kunci: Instagram, TikTok, Facebook, X, YouTube, dan Telegram. Untuk Actor yang mendukung daftar pencarian, `queryField` akan diisi dengan temuan Situasi, kata kunci, istilah Indonesia, dan variasi 38 provinsi. `maxQueries: 100` membatasi ekspansi per Actor agar tidak mengirim daftar input yang terlalu besar. Situs pemerintah sudah mencakup portal nasional dan 38 domain provinsi.
+  **Sumber yang perlu diganti sebelum dijalankan:** Konfigurasi pemerintah sudah memuat portal nasional dan 38 domain pemerintah provinsi; tinjau kembali setiap portal bila pemerintah daerah mengubah domainnya. 
+  **Wajib disesuaikan sebelum dijalankan:** ganti URL halaman Facebook, username kanal Telegram, dan seluruh URL pemerintah dengan sumber resmi yang benar-benar dipantau. Actor Facebook hanya mengambil halaman publik yang dicantumkan. Instagram pada contoh ini menggunakan hashtag publik `#Indonesia`; ganti/duplikasi Actor config bila ingin memantau hashtag lain. Actor yang mendukung pencarian berbasis array akan menerima perluasan kata kunci nasional dan 38 provinsi melalui `queryField`.
   A category accepts one Actor object or an array. Actor IDs may be written as Apify Store `owner/actor` slugs; the backend converts them to the API's `owner~actor` form. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 30, hard maximum 500).

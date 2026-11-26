@@ -48,17 +48,17 @@ function FindingCard({ item, ews, monitored, onMonitor }: { item: SituationEntry
     <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase text-primary">Temuan Sistem</p><h3 className="mt-2 text-base font-semibold">{item.name}</h3></div><div className="flex flex-col items-end gap-1">{item.risk && <RiskLabel value={item.risk} />}{ews && ews.data_quality === "sufficient" && <EwsLevelBadge level={ews.level} />}</div></div>
     <p className="mt-3 text-xs leading-5 text-muted-foreground">{item.description}</p>
     <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-      <div><dt className="text-muted-foreground">Volume</dt><dd className="mt-1 font-semibold text-chart-2">{item.growth}</dd></div>
-      <div><dt className="text-muted-foreground">Cakupan</dt><dd className="mt-1 font-medium">{item.regionsGrowing}</dd></div>
-      <div className="col-span-2"><dt className="text-muted-foreground">Narasi dominan</dt><dd className="mt-1 font-medium">{item.dominantNarrative}</dd></div>
-      <div className="col-span-2"><dt className="text-muted-foreground">Pemicu</dt><dd className="mt-1 font-medium">{item.detectedReason}</dd></div>
-      {ews && <>
-        <div><dt className="text-muted-foreground">Kualitas data</dt><dd className="mt-1 font-medium">{ews.data_quality === "sufficient" ? `Skor ${ews.risk_score ?? "—"}/100` : `Data belum cukup (${ews.evidence_count} observasi)`}</dd></div>
+      <div><dt className="text-muted-foreground">Volume</dt><dd className="mt-1 font-semibold text-chart-2">{item.growth ?? "—"}</dd></div>
+      <div><dt className="text-muted-foreground">Cakupan</dt><dd className="mt-1 font-medium">{item.regionsGrowing ?? "—"}</dd></div>
+      <div className="col-span-2"><dt className="text-muted-foreground">Narasi dominan</dt><dd className="mt-1 font-medium">{item.dominantNarrative ?? "—"}</dd></div>
+      <div className="col-span-2"><dt className="text-muted-foreground">Pemicu</dt><dd className="mt-1 font-medium">{item.detectedReason ?? "Menunggu observasi aktual yang memadai."}</dd></div>
+      <div><dt className="text-muted-foreground">Kualitas data EWS</dt><dd className="mt-1 font-medium">{item.dataQuality === "sufficient" ? `Skor ${item.riskScore ?? "—"}/100` : "Belum cukup bukti terbaru"}</dd></div>
+      {ews ? <>
         <div><dt className="text-muted-foreground">Pertama terdeteksi</dt><dd className="mt-1 font-medium">{ews.first_detected_at ? new Date(ews.first_detected_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }) : "—"}</dd></div>
         <div><dt className="text-muted-foreground">Status penanganan</dt><dd className="mt-1 font-medium">{ews.handling_status}</dd></div>
         <div className="col-span-2"><dt className="text-muted-foreground">Indikator pemicu (EWS)</dt><dd className="mt-1 font-medium">{ews.data_quality === "sufficient" ? ews.triggers.join(" · ") : "Belum cukup observasi aktual untuk menghitung pemicu risiko."}</dd></div>
         <div className="col-span-2"><dt className="text-muted-foreground">PIC</dt><dd className="mt-1 font-medium">{ews.pic ?? "Belum ditetapkan"}</dd></div>
-      </>}
+      </> : <div><dt className="text-muted-foreground">Status EWS</dt><dd className="mt-1 font-medium">Belum ada peringatan terhitung</dd></div>}
     </dl>
     <div className="mt-auto flex flex-wrap gap-2 pt-5">
       <Button asChild size="sm"><Link to="/situasi/$slug" params={{ slug: item.slug }}>Lihat Situasi<ArrowRight /></Link></Button>

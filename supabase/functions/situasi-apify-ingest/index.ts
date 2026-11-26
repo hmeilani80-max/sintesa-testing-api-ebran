@@ -380,7 +380,7 @@ Deno.serve(async (req: Request) => {
       ((value as ActorConfig).maxQueries === undefined || Number.isInteger((value as ActorConfig).maxQueries))
     );
   }
-  const selectedActors = (actorConfig[requestedCategory] ?? []).filter((config) => config.actorId === requestedActorId);
+  const selectedActors = (actorConfig[requestedCategory] ?? []).filter((config) => config.actorId === requestedActorId && config.queryField === "queries" && Array.isArray(config.input.queries));
   if (selectedActors.length !== 1) {
     return json({ error: "Konfigurasi Google News harus tepat satu Actor dengan ID mastertools/google-news-scraper pada APIFY_SITUASI_ACTORS.news." }, 503);
   }

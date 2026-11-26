@@ -117,6 +117,11 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
   };
 }
 
+function apifyActorId(actorId: string): string {
+  // Apify Store URLs use owner/actor; the API accepts owner~actor.
+  return actorId.includes("/") && !actorId.includes("~") ? actorId.replace("/", "~") : actorId;
+}
+
 function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, unknown> {
   if (!config.queryField) return config.input;
   const fieldName = config.queryField.trim();
@@ -132,7 +137,7 @@ function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, u
   const provinceQueries = terms.flatMap((term) => INDONESIA_PROVINCES.map((province) => `${term} ${province}`));
   return {
     ...config.input,
-    [fieldName]: [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 500),
+    [fieldName]: [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 1000),
   };
 }
 
@@ -247,7 +252,7 @@ async function processCategory(
     let started: Record<string, unknown>;
     try {
       started = await apify(apifyToken,
-        `actors/${encodeURIComponent(config.actorId)}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
+        `actors/${encodeURIComponent(apifyActorId(config.actorId))}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
         "POST", buildActorInput(config, topics)) as Record<string, unknown>;
     } catch (error) {
       await updateRun(base, serviceKey, String(log.id), {

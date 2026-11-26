@@ -96,7 +96,8 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
   if (!content.trim()) return null;
   const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "createdTime", "created_time", "createTime", "takenAtTimestamp", "timestamp", "time"]) ??
     firstString(nestedMetadata, ["publishedTime", "datePublished", "published_at", "date", "lastModified", "article:published_time"]);
-  const numericDate = rawDate && /^\\d{10,13}$/.test(rawDate) ? Number(rawDate) : null;\n  const date = rawDate ? new Date(numericDate ? (rawDate.length === 10 ? numericDate * 1000 : numericDate) : rawDate) : null;
+  const numericDate = rawDate && /^\d{10,13}$/.test(rawDate) ? Number(rawDate) : null;
+  const date = rawDate ? new Date(numericDate ? (rawDate.length === 10 ? numericDate * 1000 : numericDate) : rawDate) : null;
   const publishedAt = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
   const platform = firstString(item, ["platform", "socialNetwork", "network"]) ??
     (category === "news" ? "News" : category === "social" ? "Media Sosial" : "Situs Pemerintah");

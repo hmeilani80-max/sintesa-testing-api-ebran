@@ -154,7 +154,8 @@ async function consumeDataset(
         match_status: matchStatus,
         raw_item: raw,
       }, "resolution=ignore-duplicates,return=representation");
-      if (Array.isArray(saved) && saved.length) stats.items_saved++;
+      const rawInserted = Array.isArray(saved) && saved.length > 0;
+      if (rawInserted) stats.items_saved++;
       else stats.duplicates_skipped++;
 
       if (!topic || !item.url || !item.publishedAt) {
@@ -181,7 +182,7 @@ async function consumeDataset(
         },
       });
       if (inserted === true) stats.observations_inserted++;
-      else stats.duplicates_skipped++;
+      else if (rawInserted) stats.duplicates_skipped++;
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "Item gagal diproses");
     }

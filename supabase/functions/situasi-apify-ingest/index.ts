@@ -250,6 +250,10 @@ async function processCategory(
     `situasi_apify_ingestion_runs?source_category=eq.${category}&actor_id=eq.${encodeURIComponent(config.actorId)}&status=eq.running&actor_run_id=not.is.null&order=started_at.asc&limit=1`) as Record<string, unknown>[];
   let log = existing?.[0];
 
+  if (!log && !allowStart) {
+    return { category, status: "deferred", message: "Menunggu slot Actor; batas maksimal Actor aktif telah tercapai." };
+  }
+
   if (!log) {
     const created = await rest(base, serviceKey, "situasi_apify_ingestion_runs", "POST", {
       source_category: category, actor_id: config.actorId, status: "running",
@@ -278,7 +282,7 @@ async function processCategory(
     });
     log = { ...log, actor_run_id: started.id, dataset_id: started.defaultDatasetId, status: "running" };
     if (started.status === "RUNNING" || started.status === "READY" || started.status === "TIMING-OUT") {
-      return { category, status: "running", actorRunId: started.id, message: "Actor masih berjalan; pengambilan dataset dilanjutkan pada pemanggilan berikutnya." };
+      return { category, status: "running", actorRunId: started.id, startedNew: true, message: "Actor masih berjalan; pengambilan dataset dilanjutkan pada pemanggilan berikutnya." };
     }
     if (started.status !== "SUCCEEDED") throw new Error(`Actor berakhir dengan status ${String(started.status ?? "unknown")}`);
     const result = await consumeDataset(base, serviceKey, apifyToken, { ...started, id: log.id, apifyRunId: started.id }, category, config.actorId, config.platform, topics, maxItems);
@@ -355,23 +359,42 @@ Deno.serve(async (req: Request) => {
   if (!configured.length) return json({ error: "Belum ada Actor news/social/government di APIFY_SITUASI_ACTORS" }, 503);
 
   const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "30") || 30));
-  const maxCost = Math.min(25, Math.max(0.1, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.1") || 0.1));
+  const maxCost = Math.min(25, Math.max(0.5, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.5") || 0.5));
+  const maxConcurrentRuns = Math.min(5, Math.max(1, Number(Deno.env.get("APIFY_MAX_CONCURRENT_RUNS") ?? "5") || 5));
   const base = supabaseUrl.replace(/\/$/, "");
   try {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];
-    const tasks = configured.flatMap((category) =>
-      (actorConfig[category] ?? []).map(async (config) => {
+    // Count all account-level active runs, including runs started outside this pipeline.
+    // Fail closed if Apify cannot provide the count: never risk exceeding the account concurrency limit.
+    const activeResponse = await apify(apifyToken, "actor-runs?limit=1000&desc=1") as Record<string, unknown>;
+    const activeData = (activeResponse.data && typeof activeResponse.data === "object")
+      ? activeResponse.data as Record<string, unknown> : activeResponse;
+    const allRuns = Array.isArray(activeData.items) ? activeData.items as Record<string, unknown>[] : null;
+    if (!allRuns) throw new Error("Apify tidak mengembalikan daftar Actor runs; proses dihentikan demi keamanan batas konkurensi.");
+    let activeCount = allRuns.filter((run) => ["READY", "RUNNING", "TIMING-OUT"].includes(String(run.status))).length;
+    const results: Record<string, unknown>[] = [];
+    for (const category of configured) {
+      for (const config of actorConfig[category] ?? []) {
+        const allowStart = activeCount < maxConcurrentRuns;
         try {
-          return await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost);
+          const result = await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost, allowStart);
+          results.push(result);
+          if (result.status === "running" && result.startedNew === true) activeCount++;
         } catch (error) {
-          return { category, actorId: config.actorId, platform: config.platform ?? null, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" };
+          results.push({ category, actorId: config.actorId, platform: config.platform ?? null, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" });
         }
-      })
-    );
-    const results = await Promise.all(tasks);
+      }
+    }
     const hasFailure = results.some((result) => result.status === "failed");
-    const hasRunning = results.some((result) => result.status === "running");
-    return json({ ok: !hasFailure, status: hasFailure ? "partial" : hasRunning ? "running" : "success", results });
+    const hasRunning = results.some((result) => result.status === "running" || result.status === "deferred");
+    return json({
+      ok: !hasFailure,
+      status: hasFailure ? "partial" : hasRunning ? "running" : "success",
+      activeActorRuns: activeCount,
+      maxConcurrentRuns,
+      maxTotalChargeUsdPerActor: maxCost,
+      results,
+    });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Apify ingestion gagal" }, 500);
   }

@@ -1,5 +1,12 @@
 # Situasi Apify Ingestion
 
+## Current rollout: Google News pilot only
+The deployed Edge Function and GitHub Actions workflow are deliberately restricted to `news` / `mastertools/google-news-scraper`. Social and government Actors may remain in the server-side secret, but this workflow will not start them. Every request must explicitly send:
+```json
+{"category":"news","actorId":"mastertools/google-news-scraper"}
+```
+The first pilot caps the Google News search at 10 queries and 10 articles per query, uses the Indonesia edition (`country: ID`, `language: id`), limits the period to one day, sorts newest first, resolves publisher URLs, and disables full-article extraction. The Actor run also has the existing USD 0.50 Apify charge ceiling. This is a controlled validation run, not yet full 38-province coverage. Expand provincial query coverage only after the first run is confirmed in Supabase and Menu Situasi.
+
 ## Scope
 This pipeline collects public web evidence for three configurable categories: news, social media, and government websites. It does not assume that any Actor exists or that an Actor's output schema is universal. Actor IDs and input payloads are supplied by the project owner through server-side secrets.
 
@@ -259,7 +266,7 @@ Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the
 - Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds. Actor starts are serialized through a queue and guarded by the Apify account-wide active-run count; no more than five Actor runs are launched concurrently by this pipeline.
 
 ## Actor selection
-Choose Actors in Apify Store that you are licensed and permitted to use. Confirm their current input schema, output fields, platform terms, rate limits, and pricing before adding them to `APIFY_SITUASI_ACTORS`. For national and all-province coverage, include countrywide searches and province-specific search terms or official provincial URLs in each Actor's own input. Avoid private-account scraping, login bypass, or collection of sensitive personal data.
+The current scheduled workflow executes only the Google News pilot described above. Do not add or enable another Actor until its input and output schemas, price, and a single test run have been verified. For later stages, choose Actors in Apify Store that you are licensed and permitted to use. Confirm their current input schema, output fields, platform terms, rate limits, and pricing before adding them to `APIFY_SITUASI_ACTORS`. For national and all-province coverage, include countrywide searches and province-specific search terms or official provincial URLs in each Actor's own input. Avoid private-account scraping, login bypass, or collection of sensitive personal data.
 
 ## Trigger and monitoring
 GitHub Actions runs every 3 hours and supports manual dispatch:

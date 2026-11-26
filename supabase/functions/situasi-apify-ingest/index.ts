@@ -93,12 +93,15 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
   return {
     title: title || content.slice(0, 240),
     content: content.slice(0, 12000),
-    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl"])),
+    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "canonicalUrl"]) ??
+      firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
-    sourceName: firstString(item, ["sourceName", "publisher", "siteName", "website", "domain"]),
-    province: firstString(item, ["province", "provinsi"]),
-    region: firstString(item, ["region", "location", "locationName", "city"]),
+    sourceName: firstString(item, ["sourceName", "publisher", "siteName", "website", "domain"]) ??
+      firstString(nestedMetadata, ["siteName", "og:site_name", "publisher"]),
+    province: firstString(item, ["province", "provinsi"]) ?? firstString(nestedMetadata, ["province", "provinsi"]),
+    region: firstString(item, ["region", "location", "locationName", "city"]) ??
+      firstString(nestedMetadata, ["region", "location", "city"]),
     actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName"]),
   };
 }

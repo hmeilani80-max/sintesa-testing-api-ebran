@@ -353,8 +353,8 @@ Deno.serve(async (req: Request) => {
   const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);
   if (!configured.length) return json({ error: "Belum ada Actor news/social/government di APIFY_SITUASI_ACTORS" }, 503);
 
-  const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "100") || 100));
-  const maxCost = Math.min(25, Math.max(0.1, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.5") || 0.5));
+  const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "30") || 30));
+  const maxCost = Math.min(25, Math.max(0.1, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.1") || 0.1));
   const base = supabaseUrl.replace(/\/$/, "");
   try {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];

@@ -2,7 +2,7 @@ name: Situasi Apify Ingestion
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -12,6 +12,7 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Validate Apify ingestion secret
         env:
@@ -26,7 +27,7 @@ jobs:
           INGEST_SECRET: ${{ secrets.SITUASI_APIFY_INGEST_SECRET }}
         run: |
           curl --fail-with-body --silent --show-error \
-            --max-time 120 \
+            --max-time 300 \
             --request POST \
             --header "x-apify-ingest-secret: $INGEST_SECRET" \
             --header "content-type: application/json" \

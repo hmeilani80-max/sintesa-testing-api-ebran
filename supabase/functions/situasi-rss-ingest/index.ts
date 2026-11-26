@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
 
           const inserted = await rest(`${base}/rpc/ingest_situasi_rss_observation`, serviceKey, "POST", {
             p_topic_slug: topic.slug,
-            p_actor: `Media: ${feed.label}`,
+            p_actor: null,
             p_content: `${item.title}\n\n${item.description}`,
             p_narrative: item.title,
             p_observed_at: publishedAt.toISOString(),

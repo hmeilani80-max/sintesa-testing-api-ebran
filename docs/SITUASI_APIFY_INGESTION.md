@@ -9,18 +9,28 @@ This pipeline collects public web evidence for three configurable categories: ne
   ```json
   {
     "news": [
-      { "actorId": "username~news-actor", "input": { "keywords": ["Indonesia"], "languages": ["id"], "maxArticles": 100 } }
+      {
+        "actorId": "tidytools/news-scraper",
+        "queryField": "keywords",
+        "input": { "countries": ["ID"], "languages": ["id"], "maxArticles": 100 }
+      }
     ],
     "social": [
-      { "actorId": "username~instagram-actor", "input": { "search": ["Indonesia"] } },
-      { "actorId": "username~tiktok-actor", "input": { "searchQueries": ["Indonesia"] } },
-      { "actorId": "username~x-actor", "input": { "searchTerms": ["Indonesia"] } }
+      {
+        "actorId": "username~social-actor",
+        "queryField": "searchTerms",
+        "input": { "searchTerms": [] }
+      }
     ],
     "government": [
-      { "actorId": "username~website-actor", "input": { "startUrls": [{ "url": "https://www.go.id" }] } }
+      {
+        "actorId": "apify/website-content-crawler",
+        "input": { "startUrls": [{ "url": "https://domain-resmi-provinsi.go.id" }] }
+      }
     ]
   }
   ```
+  A category accepts one Actor object or an array. The example social Actor and its input schema are placeholders; use the exact field names required by the Actor you select. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
   Each category accepts either one Actor object or an array of Actor objects. The example input keys are illustrative only. Replace them with the exact input schema required by each selected Actor. You can use multiple social Actors to cover multiple public platforms.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 100, hard maximum 500).
@@ -30,10 +40,10 @@ This pipeline collects public web evidence for three configurable categories: ne
 Add `SITUASI_APIFY_INGEST_SECRET` to repository Actions secrets with exactly the same value as the Supabase Edge Function secret.
 
 ## Data handling
-- The pipeline reads the existing `situasi_system_findings` and matches only explicit existing finding names/keywords.
+- The pipeline reads the existing `situasi_system_findings`; when `queryField` is configured it expands those topic names and up to two keywords into nationwide plus 38 province-specific queries. It matches only explicit existing finding names/keywords.
 - All normalized items are retained in `situasi_apify_items`, including unmatched items, for analyst review.
 - Only items with a valid source URL, a parseable published timestamp, and an existing topic match are promoted to `situasi_observations`.
-- Province/region fields are copied only when present in Actor output; the pipeline does not infer a location.
+- Province/region fields are copied only when present in Actor output; the pipeline does not infer a location. Government Actors must be given official provincial start URLs in their own `input.startUrls` configuration.
 - Sentiment and risk are not fabricated by the collector. The existing EWS database trigger computes risk only from its evidence rules.
 - Deduplication uses a SHA-256 item hash for raw items and source URL for promoted Apify observations.
 - Runs are asynchronous. If an Actor is still running after 30 seconds, the next scheduled invocation polls its run ID and processes its dataset after it succeeds.

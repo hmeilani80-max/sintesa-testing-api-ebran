@@ -150,6 +150,7 @@ function Exploration() {
         }))} />
         <Panel title="Sentimen per Platform">
           {sentimentRows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-muted-foreground"><th className="p-2">Platform</th><th className="p-2">Sentimen</th><th className="p-2">Persentase</th><th className="p-2">Jumlah</th></tr></thead><tbody>{sentimentRows.map((row, index) => <tr key={`${row.platform}-${row.sentiment}-${index}`} className="border-b border-border/60"><td className="p-2">{row.platform}</td><td className="p-2">{row.sentiment}</td><td className="p-2">{row.percentage}%</td><td className="p-2">{row.count.toLocaleString("id-ID")}</td></tr>)}</tbody></table></div> : <p className="text-xs text-muted-foreground">Belum ada metrik sentimen tersimpan.</p>}
+        </Panel>
       </TabsContent>
     </Tabs>
     <div className="mt-4 space-y-4">

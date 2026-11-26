@@ -179,7 +179,7 @@ export function SituationProvider({
           slug: row.slug,
           name: row.name,
           source: "Temuan Sistem" as const,
-          risk: (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah"
+          risk: (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah" || row.risk === "Kritis"
             ? row.risk
             : undefined),
           status: row.status,

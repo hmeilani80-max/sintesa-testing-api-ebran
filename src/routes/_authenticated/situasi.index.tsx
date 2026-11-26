@@ -48,7 +48,7 @@ function FindingCard({ item, ews, monitored, onMonitor }: { item: SituationEntry
     <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase text-primary">Temuan Sistem</p><h3 className="mt-2 text-base font-semibold">{item.name}</h3></div><div className="flex flex-col items-end gap-1">{item.risk && <RiskLabel value={item.risk} />}{ews && ews.data_quality === "sufficient" && <EwsLevelBadge level={ews.level} />}</div></div>
     <p className="mt-3 text-xs leading-5 text-muted-foreground">{item.description}</p>
     <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-      <div><dt className="text-muted-foreground">Volume</dt><dd className="mt-1 font-semibold text-chart-2">{item.growth ?? "—"}</dd></div>
+      <div><dt className="text-muted-foreground">Pertumbuhan</dt><dd className="mt-1 font-semibold text-chart-2">{item.growth ?? "—"}</dd></div>
       <div><dt className="text-muted-foreground">Cakupan</dt><dd className="mt-1 font-medium">{item.regionsGrowing ?? "—"}</dd></div>
       <div className="col-span-2"><dt className="text-muted-foreground">Narasi dominan</dt><dd className="mt-1 font-medium">{item.dominantNarrative ?? "—"}</dd></div>
       <div className="col-span-2"><dt className="text-muted-foreground">Pemicu</dt><dd className="mt-1 font-medium">{item.detectedReason ?? "Menunggu observasi aktual yang memadai."}</dd></div>
@@ -125,7 +125,7 @@ function SituationCatalogue() {
       <section aria-labelledby="ews-title">
         <div className="mb-5 flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-md bg-destructive/10 text-destructive"><RadioTower className="size-4" /></span><div><h2 id="ews-title" className="text-lg font-semibold">EWS / Temuan Sistem</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Situasi yang terdeteksi otomatis berdasarkan lonjakan aktivitas, perubahan pola, risiko, atau indikator tidak biasa.</p></div></div>
         <MetricGrid items={[
-          { value: String(findings.filter((item) => item.status === "Aktif" || item.status === "Baru").length), label: "Temuan Aktif" },
+          { value: String(findings.filter((item) => item.status === "Aktif" || item.status === "Baru").length), label: "Temuan Tersimpan" },
           { value: String(findings.filter((item) => item.dataQuality === "sufficient" && (item.risk === "Tinggi" || item.risk === "Kritis")).length), label: "Risiko Tinggi" },
           { value: String(ewsRows.filter((item) => item.data_quality === "sufficient" && (item.level === "Tinggi" || item.level === "Kritis") && item.handling_status !== "Selesai").length), label: "Early Warning Aktif" },
           { value: String(newFindings24h), label: "Temuan Baru 24 Jam" },

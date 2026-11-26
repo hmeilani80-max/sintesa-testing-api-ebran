@@ -206,8 +206,15 @@ export function SituationProvider({
     }
 
     void loadSystemFindings();
+    const channel = supabase
+      .channel("situasi-findings-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "situasi_system_findings" }, () => {
+        void loadSystemFindings();
+      })
+      .subscribe();
     return () => {
       cancelled = true;
+      void supabase.removeChannel(channel);
     };
   }, []);
 

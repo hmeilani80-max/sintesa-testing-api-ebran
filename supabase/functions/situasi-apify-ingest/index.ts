@@ -77,10 +77,15 @@ function safeUrl(raw: string | null): string | null {
 function normalizeItem(raw: unknown, category: Category): NormalizedItem | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const item = raw as Record<string, unknown>;
-  const title = firstString(item, ["title", "headline", "name", "postTitle"]) ?? "";
-  const content = firstString(item, ["text", "content", "description", "fullText", "caption", "body", "summary"]) ?? title;
+  const nestedMetadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+    ? item.metadata as Record<string, unknown> : {};
+  const title = firstString(item, ["title", "headline", "name", "postTitle", "pageTitle"]) ??
+    firstString(nestedMetadata, ["title", "headline", "og:title", "pageTitle"]) ?? "";
+  const content = firstString(item, ["text", "content", "description", "fullText", "caption", "body", "summary", "markdown"]) ??
+    firstString(nestedMetadata, ["description", "og:description"]) ?? title;
   if (!content.trim()) return null;
-  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "timestamp", "time"]);
+  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "timestamp", "time"]) ??
+    firstString(nestedMetadata, ["publishedTime", "datePublished", "published_at", "date", "lastModified", "article:published_time"]);
   const date = rawDate ? new Date(rawDate) : null;
   const publishedAt = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
   const platform = firstString(item, ["platform", "socialNetwork", "network"]) ??

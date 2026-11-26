@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 type Category = "news" | "social" | "government";
-type ActorConfig = { actorId: string; input: Record<string, unknown>; queryField?: string };
+type ActorConfig = { actorId: string; input: Record<string, unknown>; queryField?: string; platform?: string };
 type Topic = { slug: string; name: string; keywords: string[] | null };
 type NormalizedItem = {
   title: string;
@@ -67,7 +67,10 @@ async function apify(token: string, path: string, method = "GET", body?: unknown
 
 function firstString(item: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
-    const value = item[key];
+    const value = key.includes(".")
+      ? key.split(".").reduce<unknown>((current, part) =>
+          current && typeof current === "object" ? (current as Record<string, unknown>)[part] : undefined, item)
+      : item[key];
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
@@ -84,7 +87,7 @@ function safeUrl(raw: string | null): string | null {
   } catch { return null; }
 }
 
-function normalizeItem(raw: unknown, category: Category): NormalizedItem | null {
+function normalizeItem(raw: unknown, category: Category, platformOverride?: string): NormalizedItem | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const item = raw as Record<string, unknown>;
   const nestedMetadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
@@ -94,26 +97,26 @@ function normalizeItem(raw: unknown, category: Category): NormalizedItem | null 
   const content = firstString(item, ["text", "content", "description", "fullText", "caption", "body", "summary", "markdown", "transcript"]) ??
     firstString(nestedMetadata, ["description", "og:description"]) ?? title;
   if (!content.trim()) return null;
-  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "createdTime", "created_time", "createTime", "takenAtTimestamp", "timestamp", "time"]) ??
+  const rawDate = firstString(item, ["publishedAt", "published_at", "datePublished", "date", "createdAt", "createdTime", "created_time", "createTime", "createTimeISO", "takenAtTimestamp", "timestamp", "time"]) ??
     firstString(nestedMetadata, ["publishedTime", "datePublished", "published_at", "date", "lastModified", "article:published_time"]);
   const numericDate = rawDate && /^\d{10,13}$/.test(rawDate) ? Number(rawDate) : null;
   const date = rawDate ? new Date(numericDate ? (rawDate.length === 10 ? numericDate * 1000 : numericDate) : rawDate) : null;
   const publishedAt = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
-  const platform = firstString(item, ["platform", "socialNetwork", "network"]) ??
+  const platform = platformOverride ?? firstString(item, ["platform", "socialNetwork", "network"]) ??
     (category === "news" ? "News" : category === "social" ? "Media Sosial" : "Situs Pemerintah");
   return {
     title: title || content.slice(0, 240),
     content: content.slice(0, 12000),
-    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
+    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
       firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
-    sourceName: firstString(item, ["sourceName", "publisher", "siteName", "website", "domain"]) ??
+    sourceName: firstString(item, ["sourceName", "publisher", "siteName", "website", "domain", "channelTitle", "channel", "channelName", "pageName"]) ??
       firstString(nestedMetadata, ["siteName", "og:site_name", "publisher"]),
     province: firstString(item, ["province", "provinsi"]) ?? firstString(nestedMetadata, ["province", "provinsi"]),
     region: firstString(item, ["region", "location", "locationName", "city"]) ??
       firstString(nestedMetadata, ["region", "location", "city"]),
-    actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName", "ownerUsername"]),
+    actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName", "ownerUsername", "authorMeta.name", "author.userName"]),
   };
 }
 
@@ -135,10 +138,15 @@ function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, u
   ]).map((term) => term.trim()).filter(Boolean))].slice(0, 20);
   const nationwideQueries = terms.map((term) => `${term} Indonesia`);
   const provinceQueries = terms.flatMap((term) => INDONESIA_PROVINCES.map((province) => `${term} ${province}`));
-  return {
-    ...config.input,
-    [fieldName]: [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 1000),
-  };
+  const expanded = [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, 1000);
+  const configuredValue = config.input[fieldName];
+  // Most search Actors accept arrays; Google SERP-style Actors accept one query string.
+  const queryValue = Array.isArray(configuredValue) || configuredValue === undefined
+    ? expanded
+    : typeof configuredValue === "string"
+      ? [...new Set([configuredValue, ...nationwideQueries.slice(0, 4)])].join(" OR ").slice(0, 900)
+      : configuredValue;
+  return { ...config.input, [fieldName]: queryValue };
 }
 
 function matchTopic(text: string, topics: Topic[]): Topic | null {
@@ -165,7 +173,7 @@ async function updateRun(base: string, serviceKey: string, id: string, patch: Re
 
 async function consumeDataset(
   base: string, serviceKey: string, apifyToken: string, run: Record<string, unknown>,
-  category: Category, actorId: string, topics: Topic[], maxItems: number,
+  category: Category, actorId: string, platform: string | undefined, topics: Topic[], maxItems: number,
 ) {
   const datasetId = String(run.defaultDatasetId ?? "");
   if (!datasetId) throw new Error("Actor run tidak mengembalikan defaultDatasetId");
@@ -175,7 +183,7 @@ async function consumeDataset(
 
   for (const raw of Array.isArray(rows) ? rows : []) {
     try {
-      const item = normalizeItem(raw, category);
+      const item = normalizeItem(raw, category, platform);
       if (!item) { stats.unmatched_items++; continue; }
       const topic = matchTopic(`${item.title} ${item.content}`, topics);
       const hash = await hashItem(category, item);
@@ -273,7 +281,7 @@ async function processCategory(
       return { category, status: "running", actorRunId: started.id, message: "Actor masih berjalan; pengambilan dataset dilanjutkan pada pemanggilan berikutnya." };
     }
     if (started.status !== "SUCCEEDED") throw new Error(`Actor berakhir dengan status ${String(started.status ?? "unknown")}`);
-    const result = await consumeDataset(base, serviceKey, apifyToken, { ...started, id: log.id, apifyRunId: started.id }, category, config.actorId, topics, maxItems);
+    const result = await consumeDataset(base, serviceKey, apifyToken, { ...started, id: log.id, apifyRunId: started.id }, category, config.actorId, config.platform, topics, maxItems);
     const status = result.errors.length ? "partial" : "success";
     await updateRun(base, serviceKey, String(log.id), {
       status, finished_at: new Date().toISOString(), dataset_id: result.datasetId,
@@ -338,7 +346,7 @@ Deno.serve(async (req: Request) => {
       (value as ActorConfig).actorId.trim().length > 0 &&
       !!(value as ActorConfig).input && typeof (value as ActorConfig).input === "object" &&
       !Array.isArray((value as ActorConfig).input) &&
-      ((value as ActorConfig).queryField === undefined || typeof (value as ActorConfig).queryField === "string")
+      ((value as ActorConfig).queryField === undefined || typeof (value as ActorConfig).queryField === "string") &&\n      ((value as ActorConfig).platform === undefined || typeof (value as ActorConfig).platform === "string")
     );
   }
   const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);
@@ -349,16 +357,16 @@ Deno.serve(async (req: Request) => {
   const base = supabaseUrl.replace(/\/$/, "");
   try {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];
-    const results = [];
-    for (const category of configured) {
-      for (const config of actorConfig[category] ?? []) {
+    const tasks = configured.flatMap((category) =>
+      (actorConfig[category] ?? []).map(async (config) => {
         try {
-          results.push(await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost));
+          return await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost);
         } catch (error) {
-          results.push({ category, actorId: config.actorId, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" });
+          return { category, actorId: config.actorId, platform: config.platform ?? null, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" };
         }
-      }
-    }
+      })
+    );
+    const results = await Promise.all(tasks);
     const hasFailure = results.some((result) => result.status === "failed");
     const hasRunning = results.some((result) => result.status === "running");
     return json({ ok: !hasFailure, status: hasFailure ? "partial" : hasRunning ? "running" : "success", results });

@@ -13,6 +13,8 @@ import { EwsLevelBadge, FilterBar, MetricGrid, RiskLabel } from "@/features/situ
 import { useSituations } from "@/features/situasi/context";
 import type { SituationEntry } from "@/features/situasi/data";
 import { supabase } from "@/integrations/supabase/client";
+
+const db = supabase as any;
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/situasi/")({
@@ -88,8 +90,8 @@ function SituationCatalogue() {
     let cancelled = false;
     async function loadEws() {
       const [ewsResult, recentResult] = await Promise.all([
-        supabase.from("situasi_ews").select("slug,level,first_detected_at,triggers,handling_status,pic,reason,risk_score,data_quality,evidence_count,last_observed_at"),
-        supabase.from("situasi_system_findings").select("slug", { count: "exact", head: true })
+        db.from("situasi_ews").select("slug,level,first_detected_at,triggers,handling_status,pic,reason,risk_score,data_quality,evidence_count,last_observed_at"),
+        db.from("situasi_system_findings").select("slug", { count: "exact", head: true })
           .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       ]);
       if (cancelled) return;
@@ -106,14 +108,14 @@ function SituationCatalogue() {
       }
     }
     void loadEws();
-    const channel = supabase
+    const channel = db
       .channel("situasi-ews-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "situasi_ews" }, () => { void loadEws(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "situasi_system_findings" }, () => { void loadEws(); })
       .subscribe();
     return () => {
       cancelled = true;
-      void supabase.removeChannel(channel);
+      void db.removeChannel(channel);
     };
   }, [findings.length]);
 

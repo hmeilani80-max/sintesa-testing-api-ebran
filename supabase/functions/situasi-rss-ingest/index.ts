@@ -35,35 +35,48 @@ function cleanText(value: string): string {
     .trim();
 }
 
-function childText(node: Element, names: string[]): string {
-  for (const name of names) {
-    const found = node.getElementsByTagName(name)[0];
-    if (found?.textContent?.trim()) return cleanText(found.textContent);
-    const byLocal = Array.from(node.children).find((child) => child.localName === name);
-    if (byLocal?.textContent?.trim()) return cleanText(byLocal.textContent);
-  }
-  return "";
+function elementContent(block: string, localName: string): string {
+  const pattern = new RegExp("<(?:[\\w.-]+:)?" + localName + "(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?" + localName + "\\s*>", "i");
+  const match = block.match(pattern);
+  if (!match) return "";
+  const decoded = match[1]
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&#x([\da-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+  return cleanText(decoded);
 }
 
-function articleLink(node: Element): string {
-  const link = Array.from(node.children).find((child) => child.localName === "link");
-  if (!link) return "";
-  if (link.getAttribute("href")) return link.getAttribute("href") ?? "";
-  return link.textContent?.trim() ?? "";
+function elementAttribute(block: string, localName: string, attribute: string): string {
+  const tagPattern = new RegExp("<(?:[\\w.-]+:)?" + localName + "\\b([^>]*)\\/?\\s*>", "i");
+  const tag = block.match(tagPattern)?.[1] ?? "";
+  const doubleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*\"([^\"]*)\"", "i"));
+  const singleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*'([^']*)'", "i"));
+  const attr = doubleQuoted ?? singleQuoted;
+  return attr?.[1]?.trim() ?? "";
 }
 
 function parseFeed(xml: string): Array<{ title: string; description: string; link: string; published: string }> {
-  const doc = new DOMParser().parseFromString(xml, "text/xml");
-  if (!doc || doc.querySelector("parsererror")) throw new Error("RSS XML tidak valid");
-  const nodes = [...Array.from(doc.getElementsByTagName("item")), ...Array.from(doc.getElementsByTagName("entry"))];
-  return nodes.slice(0, 60).map((node) => ({
-    title: childText(node, ["title"]),
-    description: childText(node, ["description", "summary", "content:encoded", "content"]),
-    link: articleLink(node),
-    published: childText(node, ["pubDate", "published", "updated", "dc:date"]),
-  })).filter((item) => item.title && item.link && item.published);
+  if (!/<(?:[A-Za-z0-9_.-]+:)?(?:rss|feed|RDF)\b/i.test(xml)) {
+    throw new Error("Respons feed bukan dokumen RSS/Atom XML");
+  }
+  const blocks = [...xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?(item|entry)\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\1\s*>/gi)];
+  return blocks.slice(0, 60).map((match) => {
+    const block = match[2];
+    const link = elementAttribute(block, "link", "href") || elementContent(block, "link");
+    return {
+      title: elementContent(block, "title"),
+      description: elementContent(block, "description") || elementContent(block, "summary") || elementContent(block, "encoded") || elementContent(block, "content"),
+      link,
+      published: elementContent(block, "pubDate") || elementContent(block, "published") || elementContent(block, "updated") || elementContent(block, "date"),
+    };
+  }).filter((item) => item.title && item.link && item.published);
 }
-
 function safeArticleUrl(raw: string, feedUrl: string): string | null {
   try {
     const url = new URL(raw, feedUrl);

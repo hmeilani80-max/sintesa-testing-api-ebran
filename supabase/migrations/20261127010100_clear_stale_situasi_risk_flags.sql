@@ -16,3 +16,6 @@ before insert or update of data_quality on public.situasi_system_findings
 for each row execute function public.clear_stale_situasi_finding_risk();
 
 revoke all on function public.clear_stale_situasi_finding_risk() from public,anon,authenticated;
+
+-- Re-evaluate existing rows after the guard trigger is installed.
+update public.situasi_system_findings set data_quality='insufficient' where data_quality='insufficient';

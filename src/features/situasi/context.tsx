@@ -11,12 +11,13 @@ import type { ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 
-const db = supabase as any;
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
   monitoredTopics,
   type SituationEntry,
 } from "./data";
+
+const db = supabase as any;
 
 type NewTopic = Pick<
   SituationEntry,
@@ -65,7 +66,7 @@ function getTodayIndonesia(): string {
 async function syncTopicToDatabase(
   topic: SituationEntry,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from("situasi_topics")
     .upsert(
       {
@@ -109,7 +110,7 @@ async function syncTopicToDatabase(
 async function syncMonitoringToDatabase(
   slug: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from("situasi_topic_monitoring")
     .upsert(
       {
@@ -152,7 +153,7 @@ export function SituationProvider({
     let cancelled = false;
 
     async function loadSystemFindings() {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("situasi_system_findings")
         .select("*")
         .order("created_at", { ascending: true });

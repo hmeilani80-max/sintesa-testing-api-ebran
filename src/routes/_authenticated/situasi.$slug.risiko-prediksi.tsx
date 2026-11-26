@@ -58,7 +58,7 @@ function RiskForecast() {
       const [riskResult, trendResult, ewsResult] = await Promise.all([
         db.from("situasi_risk_profiles").select("*").eq("topic_slug", slug).maybeSingle(),
         db.from("situasi_trend_points").select("*").eq("topic_slug", slug).gte("period_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)).order("period_date", { ascending: true }),
-        db.from("situasi_ews").select("slug").eq("topic_slug", slug).maybeSingle(),
+        db.from("situasi_ews").select("slug,data_quality").eq("topic_slug", slug).maybeSingle(),
       ]);
       if (cancelled) return;
       const row = riskResult.data;
@@ -86,13 +86,15 @@ function RiskForecast() {
         forecast: item.forecast_volume,
         volume: item.volume,
       })) : []);
-      if (ewsResult.data?.slug) {
-        const history = await db.from("situasi_ews_history").select("*").eq("ews_slug", ewsResult.data.slug).order("event_at", { ascending: true });
+      if (ewsResult.data?.slug && ewsResult.data.data_quality === "sufficient") {
+        const history = await db.from("situasi_ews_history").select("*").eq("ews_slug", ewsResult.data.slug).eq("actor", "Mesin EWS").order("event_at", { ascending: true });
         if (!cancelled) setHistoryRows(Array.isArray(history.data) ? history.data.map((item: any) => ({
           time: new Date(item.event_at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }),
           event: item.event,
           status: item.status,
         })) : []);
+      } else {
+        setHistoryRows([]);
       }
     }
     void loadRiskData().catch((error) => console.error("[Situasi] Gagal memuat data Risiko & Prediksi:", error));

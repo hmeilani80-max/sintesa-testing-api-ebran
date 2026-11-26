@@ -346,7 +346,8 @@ Deno.serve(async (req: Request) => {
       (value as ActorConfig).actorId.trim().length > 0 &&
       !!(value as ActorConfig).input && typeof (value as ActorConfig).input === "object" &&
       !Array.isArray((value as ActorConfig).input) &&
-      ((value as ActorConfig).queryField === undefined || typeof (value as ActorConfig).queryField === "string") &&\n      ((value as ActorConfig).platform === undefined || typeof (value as ActorConfig).platform === "string")
+      ((value as ActorConfig).queryField === undefined || typeof (value as ActorConfig).queryField === "string") &&
+      ((value as ActorConfig).platform === undefined || typeof (value as ActorConfig).platform === "string")
     );
   }
   const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);

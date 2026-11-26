@@ -31,6 +31,10 @@ export type SituationEntry = {
   regionsGrowing?: string;
   dominantNarrative?: string;
   warningStatus?: string;
+  riskScore?: number;
+  dataQuality?: "sufficient" | "insufficient";
+  evidenceCount?: number;
+  lastObservedAt?: string;
   createdBy?: string;
 };
 

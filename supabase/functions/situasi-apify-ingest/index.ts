@@ -107,7 +107,7 @@ function normalizeItem(raw: unknown, category: Category, platformOverride?: stri
   return {
     title: title || content.slice(0, 240),
     content: content.slice(0, 12000),
-    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
+    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
       firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
@@ -305,7 +305,7 @@ async function processCategory(
     });
     return { category, status: "failed", actorStatus };
   }
-  const result = await consumeDataset(base, serviceKey, apifyToken, { ...actorRun, id: log.id, apifyRunId: log.actor_run_id }, category, config.actorId, topics, maxItems);
+  const result = await consumeDataset(base, serviceKey, apifyToken, { ...actorRun, id: log.id, apifyRunId: log.actor_run_id }, category, config.actorId, config.platform, topics, maxItems);
   const status = result.errors.length ? "partial" : "success";
   await updateRun(base, serviceKey, String(log.id), {
     status, finished_at: new Date().toISOString(), dataset_id: result.datasetId,

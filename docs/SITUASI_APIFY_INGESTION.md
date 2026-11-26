@@ -12,7 +12,7 @@ This pipeline collects public web evidence for three configurable categories: ne
       {
         "actorId": "tidytools/news-scraper",
         "queryField": "keywords",
-        "input": { "countries": ["ID"], "languages": ["id"], "maxArticles": 100 }
+        "input": { "countries": ["Indonesia"], "languages": ["id"], "maxArticles": 100 }
       }
     ],
     "social": [
@@ -31,7 +31,6 @@ This pipeline collects public web evidence for three configurable categories: ne
   }
   ```
   A category accepts one Actor object or an array. The example social Actor and its input schema are placeholders; use the exact field names required by the Actor you select. For an Actor that accepts an array of search phrases, set `queryField` to that input field. The function then adds nationwide and province-specific searches for existing Situasi findings.
-  Each category accepts either one Actor object or an array of Actor objects. The example input keys are illustrative only. Replace them with the exact input schema required by each selected Actor. You can use multiple social Actors to cover multiple public platforms.
 - `SITUASI_APIFY_INGEST_SECRET`: long random shared secret used only by GitHub Actions and the Edge Function.
 - Optional `APIFY_MAX_ITEMS`: maximum dataset items per Actor run (default 100, hard maximum 500).
 - Optional `APIFY_MAX_TOTAL_CHARGE_USD`: per Actor run spend ceiling (default USD 2, hard maximum USD 25).

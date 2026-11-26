@@ -125,7 +125,7 @@ function apifyActorId(actorId: string): string {
   return actorId.includes("/") && !actorId.includes("~") ? actorId.replace("/", "~") : actorId;
 }
 
-function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, unknown> {
+function buildActorInput(config: ActorConfig, topics: Topic[], pilotGoogleNews = false): Record<string, unknown> {
   if (!config.queryField) return config.input;
   const fieldName = config.queryField.trim();
   if (!fieldName) return config.input;
@@ -138,7 +138,7 @@ function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, u
   ]).map((term) => term.trim()).filter(Boolean))].slice(0, 20);
   const nationwideQueries = terms.map((term) => `${term} Indonesia`);
   const provinceQueries = terms.flatMap((term) => INDONESIA_PROVINCES.map((province) => `${term} ${province}`));
-  const expanded = [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, Math.min(1000, Math.max(1, config.maxQueries ?? 100)));
+  const expanded = [...new Set([...existing, ...nationwideQueries, ...provinceQueries])].slice(0, Math.min(pilotGoogleNews ? 10 : 1000, Math.max(1, config.maxQueries ?? (pilotGoogleNews ? 10 : 100))));
   const configuredValue = config.input[fieldName];
   // Most search Actors accept arrays; Google SERP-style Actors accept one query string.
   const queryValue = Array.isArray(configuredValue) || configuredValue === undefined
@@ -146,7 +146,18 @@ function buildActorInput(config: ActorConfig, topics: Topic[]): Record<string, u
     : typeof configuredValue === "string"
       ? [...new Set([configuredValue, ...nationwideQueries.slice(0, 4)])].join(" OR ").slice(0, 900)
       : configuredValue;
-  return { ...config.input, [fieldName]: queryValue };
+  const input = { ...config.input, [fieldName]: queryValue };
+  if (pilotGoogleNews) {
+    input.maxArticles = Math.min(10, Math.max(1, Number(config.input.maxArticles) || 10));
+    input.period = "1d";
+    input.country = "ID";
+    input.language = "id";
+    input.sortBy = "date";
+    input.resolveUrls = true;
+    input.fetchArticleText = false;
+    input.onlyNew = false;
+  }
+  return input;
 }
 
 function matchTopic(text: string, topics: Topic[]): Topic | null {
@@ -245,6 +256,7 @@ async function consumeDataset(
 async function processCategory(
   base: string, serviceKey: string, apifyToken: string, category: Category,
   config: ActorConfig, topics: Topic[], maxItems: number, maxCost: number, allowStart: boolean,
+  pilotGoogleNews = false,
 ) {
   const existing = await rest(base, serviceKey,
     `situasi_apify_ingestion_runs?source_category=eq.${category}&actor_id=eq.${encodeURIComponent(config.actorId)}&status=eq.running&actor_run_id=not.is.null&order=started_at.asc&limit=1`) as Record<string, unknown>[];
@@ -265,7 +277,7 @@ async function processCategory(
     try {
       started = await apify(apifyToken,
         `actors/${encodeURIComponent(apifyActorId(config.actorId))}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
-        "POST", buildActorInput(config, topics)) as Record<string, unknown>;
+        "POST", buildActorInput(config, topics, pilotGoogleNews)) as Record<string, unknown>;
     } catch (error) {
       await updateRun(base, serviceKey, String(log.id), {
         status: "failed",
@@ -334,6 +346,19 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Konfigurasi APIFY_API_TOKEN atau Supabase belum lengkap" }, 503);
   }
 
+  let requestedCategory: Category;
+  let requestedActorId: string;
+  try {
+    const requestBody = await req.json() as Record<string, unknown>;
+    requestedCategory = requestBody.category as Category;
+    requestedActorId = typeof requestBody.actorId === "string" ? requestBody.actorId.trim() : "";
+  } catch {
+    return json({ error: "Body wajib JSON dengan category dan actorId." }, 400);
+  }
+  if (requestedCategory !== "news" || requestedActorId !== "mastertools/google-news-scraper") {
+    return json({ error: "Mode pilot hanya mengizinkan news / mastertools/google-news-scraper." }, 400);
+  }
+
   let rawActorConfig: Record<string, unknown>;
   try {
     rawActorConfig = JSON.parse(Deno.env.get("APIFY_SITUASI_ACTORS") ?? "{}");
@@ -355,8 +380,10 @@ Deno.serve(async (req: Request) => {
       ((value as ActorConfig).maxQueries === undefined || Number.isInteger((value as ActorConfig).maxQueries))
     );
   }
-  const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);
-  if (!configured.length) return json({ error: "Belum ada Actor news/social/government di APIFY_SITUASI_ACTORS" }, 503);
+  const selectedActors = (actorConfig[requestedCategory] ?? []).filter((config) => config.actorId === requestedActorId);
+  if (selectedActors.length !== 1) {
+    return json({ error: "Konfigurasi Google News harus tepat satu Actor dengan ID mastertools/google-news-scraper pada APIFY_SITUASI_ACTORS.news." }, 503);
+  }
 
   const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "30") || 30));
   const maxCost = Math.min(25, Math.max(0.5, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.5") || 0.5));
@@ -373,11 +400,11 @@ Deno.serve(async (req: Request) => {
     if (!allRuns) throw new Error("Apify tidak mengembalikan daftar Actor runs; proses dihentikan demi keamanan batas konkurensi.");
     let activeCount = allRuns.filter((run) => ["READY", "RUNNING", "TIMING-OUT"].includes(String(run.status))).length;
     const results: Record<string, unknown>[] = [];
-    for (const category of configured) {
-      for (const config of actorConfig[category] ?? []) {
+    for (const category of [requestedCategory]) {
+      for (const config of selectedActors) {
         const allowStart = activeCount < maxConcurrentRuns;
         try {
-          const result = await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost, allowStart);
+          const result = await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost, allowStart, true);
           results.push(result);
           if (result.status === "running" && result.startedNew === true) activeCount++;
         } catch (error) {
@@ -392,6 +419,7 @@ Deno.serve(async (req: Request) => {
       status: hasFailure ? "partial" : hasRunning ? "running" : "success",
       activeActorRuns: activeCount,
       maxConcurrentRuns,
+      selectedActor: requestedActorId,
       maxTotalChargeUsdPerActor: maxCost,
       results,
     });

@@ -8,7 +8,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { ActiveFilters, DetailTable, FilterBar, MetricGrid, Panel, RecordSheet, SituationMeta, SituationNav, SummaryBlock, type ActiveFilter } from "@/features/situasi/components";
 import { useSituations } from "@/features/situasi/context";
 import { useArsip } from "@/features/arsip/context";
-import { actors as fallbackActors, narratives as fallbackNarratives, records as fallbackRecords, regions as fallbackRegions, sentiment as fallbackSentiment, trend as fallbackTrend, type DetailRecord } from "@/features/situasi/data";
+import type { DetailRecord } from "@/features/situasi/data";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/situasi/$slug/")({
@@ -31,12 +31,13 @@ function SituationSummary() {
   const situation = [...topics, ...findings].find((item) => item.slug === slug);
   if (!situation) throw notFound();
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
-  const [trendRows, setTrendRows] = useState<any[]>([...fallbackTrend]);
-  const [actorRows, setActorRows] = useState<any[]>([...fallbackActors]);
-  const [narrativeRows, setNarrativeRows] = useState<any[]>([...fallbackNarratives]);
-  const [regionRows, setRegionRows] = useState<any[]>([...fallbackRegions]);
-  const [sentimentRows, setSentimentRows] = useState<any[]>([...fallbackSentiment]);
-  const [recordRows, setRecordRows] = useState<DetailRecord[]>(fallbackRecords);
+  const [trendRows, setTrendRows] = useState<any[]>([]);
+  const [actorRows, setActorRows] = useState<any[]>([]);
+  const [narrativeRows, setNarrativeRows] = useState<any[]>([]);
+  const [regionRows, setRegionRows] = useState<any[]>([]);
+  const [sentimentRows, setSentimentRows] = useState<any[]>([]);
+  const [recordRows, setRecordRows] = useState<DetailRecord[]>([]);
+  const [warningCount, setWarningCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,15 +50,17 @@ function SituationSummary() {
         db.from("situasi_region_metrics").select("*").eq("topic_slug", slug).order("volume", { ascending: false }),
         db.from("situasi_sentiment_metrics").select("*").eq("topic_slug", slug).eq("platform", "Semua Platform"),
         db.from("situasi_observations").select("*").eq("topic_slug", slug).order("observed_at", { ascending: false }),
+        db.from("situasi_risk_profiles").select("warning_count,data_quality").eq("topic_slug", slug).maybeSingle(),
       ]);
       if (cancelled) return;
-      const [trends, actorResult, narrativeResult, regionResult, sentimentResult, observationResult] = results;
-      if (trends.data?.length) setTrendRows(trends.data.map((x: any) => ({ date: x.period_date, fullDate: x.period_date, volume: Number(x.volume ?? 0) })));
-      if (actorResult.data?.length) setActorRows(actorResult.data.map((x: any) => ({ name: x.actor_name, category: x.category ?? "—", platform: x.platform ?? "—", interactions: Number(x.interactions ?? 0), reach: x.reach ? new Intl.NumberFormat("id-ID", { notation: "compact" }).format(Number(x.reach)) : "—", influence: x.influence ?? "—", cluster: x.cluster_name ?? "—", narrative: x.dominant_narrative ?? "—" })));
-      if (narrativeResult.data?.length) setNarrativeRows(narrativeResult.data.map((x: any) => ({ name: x.name, volume: Number(x.volume ?? 0), actors: Number(x.actor_count ?? 0), growth: x.growth_percent == null ? "—" : (Number(x.growth_percent) > 0 ? "+" : "") + x.growth_percent + "%" })));
-      if (regionResult.data?.length) setRegionRows(regionResult.data.map((x: any) => ({ name: x.region_name, volume: Number(x.volume ?? 0), growth: x.growth_percent == null ? "—" : (Number(x.growth_percent) > 0 ? "+" : "") + x.growth_percent + "%" })));
-      if (sentimentResult.data?.length) setSentimentRows(sentimentResult.data.map((x: any) => ({ name: x.sentiment, value: Number(x.percentage ?? 0), fill: x.sentiment === "Negatif" ? "var(--color-chart-4)" : x.sentiment === "Positif" ? "var(--color-chart-2)" : "var(--color-chart-1)" })));
-      if (observationResult.data?.length) setRecordRows(observationResult.data.map((x: any) => { const d = x.observed_at ? new Date(x.observed_at) : null; return { actor: x.actor ?? "—", platform: x.platform ?? "—", content: x.content ?? "", narrative: x.narrative ?? "—", sentiment: x.sentiment ?? "Netral", emotion: x.emotion ?? "—", region: x.region ?? "—", risk: x.risk ?? "Sedang", time: d ? d.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "—", date: d ? d.toLocaleDateString("id-ID", { day: "numeric", month: "long", timeZone: "Asia/Jakarta" }) : "—" } as DetailRecord; }));
+      const [trends, actorResult, narrativeResult, regionResult, sentimentResult, observationResult, riskResult] = results;
+      setTrendRows((trends.data ?? []).map((x: any) => ({ date: x.period_date, fullDate: x.period_date, volume: Number(x.volume ?? 0) })));
+      setActorRows((actorResult.data ?? []).map((x: any) => ({ name: x.actor_name, category: x.category ?? "—", platform: x.platform ?? "—", interactions: Number(x.interactions ?? 0), reach: x.reach ? new Intl.NumberFormat("id-ID", { notation: "compact" }).format(Number(x.reach)) : "—", influence: x.influence ?? "—", cluster: x.cluster_name ?? "—", narrative: x.dominant_narrative ?? "—" })));
+      setNarrativeRows((narrativeResult.data ?? []).map((x: any) => ({ name: x.name, volume: Number(x.volume ?? 0), actors: Number(x.actor_count ?? 0), growth: x.growth_percent == null ? "—" : (Number(x.growth_percent) > 0 ? "+" : "") + x.growth_percent + "%" })));
+      setRegionRows((regionResult.data ?? []).map((x: any) => ({ name: x.region_name, volume: Number(x.volume ?? 0), growth: x.growth_percent == null ? "—" : (Number(x.growth_percent) > 0 ? "+" : "") + x.growth_percent + "%" })));
+      setSentimentRows((sentimentResult.data ?? []).map((x: any) => ({ name: x.sentiment, value: Number(x.percentage ?? 0), fill: x.sentiment === "Negatif" ? "var(--color-chart-4)" : x.sentiment === "Positif" ? "var(--color-chart-2)" : "var(--color-chart-1)" })));
+      setRecordRows((observationResult.data ?? []).map((x: any) => { const d = x.observed_at ? new Date(x.observed_at) : null; return { actor: x.actor ?? "—", platform: x.platform ?? "—", content: x.content ?? "", narrative: x.narrative ?? "—", sentiment: x.sentiment ?? "Netral", emotion: x.emotion ?? "—", region: x.region ?? "—", risk: x.risk ?? "Sedang", time: d ? d.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "—", date: d ? d.toLocaleDateString("id-ID", { day: "numeric", month: "long", timeZone: "Asia/Jakarta" }) : "—" } as DetailRecord; }));
+      setWarningCount(riskResult.data?.data_quality === "sufficient" ? Number(riskResult.data.warning_count ?? 0) : 0);
     }
     void loadSummaryData().catch((error) => console.error("[Situasi] Gagal memuat Ringkasan dari Supabase:", error));
     return () => { cancelled = true; };
@@ -76,8 +79,8 @@ function SituationSummary() {
     <SituationMeta item={situation} /><SituationNav slug={slug} />
     <ActiveFilters filters={filters} remove={(target) => setFilters((current) => current.filter((item) => item !== target))} reset={() => setFilters([])} />
     <div className="space-y-4">
-      <MetricGrid items={[{value:situation.volume,label:"Konten Terpantau"},{value:situation.actors,label:"Aktor Teridentifikasi"},{value:situation.narratives,label:"Narasi Aktif"},{value:situation.risk === "Tinggi" ? "5" : "2",label:"Indikator Perlu Perhatian"}]} />
-      <SummaryBlock title="Ringkasan Situasi" copy={`${situation.name} sedang ${situation.status.toLowerCase()} dalam periode pemantauan. Data menunjukkan dinamika percakapan yang perlu terus diamati berdasarkan cakupan dan indikator saat ini.`} highlights={situation.triggers ?? ["Pemantauan berlangsung lintas platform.", `Cakupan wilayah: ${situation.regionScope}.`, `${situation.narratives} narasi aktif sedang ditelaah.`, "Perubahan penting akan ditampilkan sebagai early warning."]} />
+      <MetricGrid items={[{value:situation.volume,label:"Konten Terpantau"},{value:situation.actors,label:"Aktor Teridentifikasi"},{value:situation.narratives,label:"Narasi Aktif"},{value:String(warningCount),label:"Indikator Perlu Perhatian"}]} />
+      <SummaryBlock title="Ringkasan Situasi" copy={situation.dataQuality === "sufficient" ? situation.name + " memiliki bukti observasi terbaru yang cukup untuk pemantauan risiko." : situation.name + " tercatat di database, tetapi belum memiliki bukti observasi terbaru yang cukup untuk menetapkan level risiko atau early warning."} highlights={situation.dataQuality === "sufficient" ? situation.triggers ?? ["Data aktual tersedia untuk pemantauan."] : ["Status risiko belum ditetapkan.", "Diperlukan minimal 5 observasi dalam 7 hari terakhir.", "Angka dan pemicu historis tidak ditampilkan sebagai kondisi terkini."]} />
       {(() => {
         const internalRelated = arsipItems.filter((i) => i.modul === "Laporan Lapangan" && (i.ref === slug || i.verification?.situationRef === slug));
         if (!internalRelated.length) return null;

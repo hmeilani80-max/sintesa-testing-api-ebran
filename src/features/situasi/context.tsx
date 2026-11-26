@@ -10,12 +10,14 @@ import {
 import type { ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
   monitoredTopics,
-  systemFindings,
   type SituationEntry,
 } from "./data";
+
+const db = supabase as any;
 
 type NewTopic = Pick<
   SituationEntry,
@@ -64,7 +66,7 @@ function getTodayIndonesia(): string {
 async function syncTopicToDatabase(
   topic: SituationEntry,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from("situasi_topics")
     .upsert(
       {
@@ -108,7 +110,7 @@ async function syncTopicToDatabase(
 async function syncMonitoringToDatabase(
   slug: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await db
     .from("situasi_topic_monitoring")
     .upsert(
       {
@@ -143,15 +145,15 @@ export function SituationProvider({
     createdTopics: [] as SituationEntry[],
   });
   const [databaseFindings, setDatabaseFindings] =
-    useState<SituationEntry[]>(systemFindings);
+    useState<SituationEntry[]>([]);
 
-  // Temuan Sistem dibaca dari tabel relasional khusus. Data statis
-  // tetap menjadi fallback agar layar tidak kosong saat database gagal.
+  // Temuan Sistem selalu dibaca dari Supabase. Jika database gagal atau kosong,
+  // tampilkan kondisi kosong agar data contoh tidak disamarkan sebagai temuan aktual.
   useEffect(() => {
     let cancelled = false;
 
     async function loadSystemFindings() {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("situasi_system_findings")
         .select("*")
         .order("created_at", { ascending: true });
@@ -163,13 +165,12 @@ export function SituationProvider({
           "[Situasi] Gagal memuat Temuan Sistem dari database:",
           error.message,
         );
+        setDatabaseFindings([]);
         return;
       }
 
       if (!data?.length) {
-        console.warn(
-          "[Situasi] Tabel situasi_system_findings kosong; memakai data fallback.",
-        );
+        setDatabaseFindings([]);
         return;
       }
 
@@ -181,31 +182,42 @@ export function SituationProvider({
           slug: row.slug,
           name: row.name,
           source: "Temuan Sistem" as const,
-          risk: (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah"
+          risk: row.data_quality === "sufficient" && (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah" || row.risk === "Kritis")
             ? row.risk
-            : undefined),
-          status: row.status,
-          volume: formatCount(row.volume),
-          actors: formatCount(row.actor_count),
-          narratives: formatCount(row.narrative_count),
+            : undefined,
+          status: row.data_quality === "sufficient" ? row.status : "Menunggu Data",
+          volume: row.data_quality === "sufficient" ? formatCount(row.volume) : "—",
+          actors: row.data_quality === "sufficient" ? formatCount(row.actor_count) : "—",
+          narratives: row.data_quality === "sufficient" ? formatCount(row.narrative_count) : "—",
           since: row.since_label,
           description: row.description,
           platforms: row.platforms ?? [],
           regionScope: row.region_scope,
           keywords: row.keywords ?? [],
-          detectedReason: row.detected_reason ?? undefined,
-          triggers: row.triggers ?? [],
-          growth: row.growth ?? undefined,
-          regionsGrowing: row.regions_growing ?? undefined,
-          dominantNarrative: row.dominant_narrative ?? undefined,
-          warningStatus: row.warning_status ?? undefined,
+          detectedReason: row.data_quality === "sufficient" ? row.detected_reason ?? undefined : undefined,
+          triggers: row.data_quality === "sufficient" ? row.triggers ?? [] : [],
+          growth: row.data_quality === "sufficient" ? row.growth ?? undefined : undefined,
+          regionsGrowing: row.data_quality === "sufficient" ? row.regions_growing ?? undefined : undefined,
+          dominantNarrative: row.data_quality === "sufficient" ? row.dominant_narrative ?? undefined : undefined,
+          warningStatus: row.data_quality === "sufficient" ? row.warning_status ?? undefined : "Data belum cukup",
+          riskScore: row.risk_score ?? undefined,
+          dataQuality: row.data_quality ?? "insufficient",
+          evidenceCount: row.evidence_count ?? 0,
+          lastObservedAt: row.last_observed_at ?? undefined,
         })),
       );
     }
 
     void loadSystemFindings();
+    const channel = db
+      .channel("situasi-findings-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "situasi_system_findings" }, () => {
+        void loadSystemFindings();
+      })
+      .subscribe();
     return () => {
       cancelled = true;
+      void db.removeChannel(channel);
     };
   }, []);
 

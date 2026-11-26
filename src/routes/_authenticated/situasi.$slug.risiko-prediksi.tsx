@@ -9,7 +9,7 @@ import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartToo
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ActiveFilters, FilterBar, MetricGrid, Panel, RiskLabel, SituationMeta, SituationNav, SummaryBlock, type ActiveFilter } from "@/features/situasi/components";
 import { useSituations } from "@/features/situasi/context";
-import { getRiskProfile, trend, warningHistory } from "@/features/situasi/data";
+import type { SituationRiskProfile } from "@/features/situasi/data";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,14 +28,28 @@ export const Route = createFileRoute("/_authenticated/situasi/$slug/risiko-predi
 
 const chartConfig = { actual: { label: "Aktual", color: "var(--color-chart-1)" }, forecast: { label: "Proyeksi", color: "var(--color-chart-3)" } };
 
+type PersistedRiskProfile = SituationRiskProfile & {
+  riskScore: number | null;
+  dataQuality: "sufficient" | "insufficient";
+  evidenceCount: number;
+};
+
+const emptyRiskProfile: PersistedRiskProfile = {
+  activeRegions: "0", warningCount: "0", newActors: "—", negativeSentiment: "—",
+  spreadPotential: "Rendah", growingRegions: "—", drivingNarrative: "Belum tersedia",
+  factors: [], dimensions: [], warnings: [], riskDetails: [],
+  unusualActivity: "Belum cukup observasi aktual untuk menyusun analisis risiko.",
+  riskScore: null, dataQuality: "insufficient", evidenceCount: 0,
+};
+
 function RiskForecast() {
   const { slug } = Route.useParams();
   const { findings, topics } = useSituations();
   const situation = [...topics, ...findings].find((item) => item.slug === slug);
   if (!situation) throw notFound();
-  const [profile, setProfile] = useState(() => getRiskProfile(situation));
-  const [trendRows, setTrendRows] = useState<any[]>([...trend]);
-  const [historyRows, setHistoryRows] = useState<any[]>(warningHistory);
+  const [profile, setProfile] = useState<PersistedRiskProfile>(emptyRiskProfile);
+  const [trendRows, setTrendRows] = useState<any[]>([]);
+  const [historyRows, setHistoryRows] = useState<any[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,39 +57,44 @@ function RiskForecast() {
     async function loadRiskData() {
       const [riskResult, trendResult, ewsResult] = await Promise.all([
         db.from("situasi_risk_profiles").select("*").eq("topic_slug", slug).maybeSingle(),
-        db.from("situasi_trend_points").select("*").eq("topic_slug", slug).order("period_date", { ascending: true }),
-        db.from("situasi_ews").select("slug").eq("topic_slug", slug).maybeSingle(),
+        db.from("situasi_trend_points").select("*").eq("topic_slug", slug).gte("period_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)).order("period_date", { ascending: true }),
+        db.from("situasi_ews").select("slug,data_quality").eq("topic_slug", slug).maybeSingle(),
       ]);
       if (cancelled) return;
       const row = riskResult.data;
-      if (row) setProfile({
-        ...getRiskProfile(situation),
+      if (riskResult.error) console.error("[Situasi] Gagal memuat profil risiko:", riskResult.error.message);
+      setProfile(row ? {
         activeRegions: String(row.active_regions ?? 0),
         warningCount: String(row.warning_count ?? 0),
         newActors: row.new_actors ?? "—",
         negativeSentiment: row.negative_sentiment ?? "—",
-        spreadPotential: row.spread_potential ?? situation.risk ?? "Sedang",
-        growingRegions: row.growing_regions ?? situation.regionScope,
-        drivingNarrative: row.driving_narrative ?? situation.dominantNarrative ?? situation.name,
+        spreadPotential: row.spread_potential ?? "Rendah",
+        growingRegions: row.growing_regions ?? "—",
+        drivingNarrative: row.driving_narrative ?? "Belum tersedia",
         factors: Array.isArray(row.factors) ? row.factors : [],
         dimensions: Array.isArray(row.dimensions) ? row.dimensions : [],
         warnings: Array.isArray(row.warnings) ? row.warnings : [],
         riskDetails: Array.isArray(row.risk_details) ? row.risk_details : [],
-        unusualActivity: row.unusual_activity ?? "",
-      });
-      if (Array.isArray(trendResult.data) && trendResult.data.length) setTrendRows(trendResult.data.map((item: any) => ({
+        unusualActivity: row.unusual_activity ?? "Belum ada analisis aktivitas tidak biasa.",
+        riskScore: row.risk_score ?? null,
+        dataQuality: row.data_quality ?? "insufficient",
+        evidenceCount: row.evidence_count ?? 0,
+      } : emptyRiskProfile);
+      setTrendRows(Array.isArray(trendResult.data) ? trendResult.data.map((item: any) => ({
         date: item.period_date,
         actual: item.actual_volume,
         forecast: item.forecast_volume,
         volume: item.volume,
-      })));
-      if (ewsResult.data?.slug) {
-        const history = await db.from("situasi_ews_history").select("*").eq("ews_slug", ewsResult.data.slug).order("event_at", { ascending: true });
-        if (!cancelled && Array.isArray(history.data) && history.data.length) setHistoryRows(history.data.map((item: any) => ({
+      })) : []);
+      if (ewsResult.data?.slug && ewsResult.data.data_quality === "sufficient") {
+        const history = await db.from("situasi_ews_history").select("*").eq("ews_slug", ewsResult.data.slug).eq("actor", "Mesin EWS").order("event_at", { ascending: true });
+        if (!cancelled) setHistoryRows(Array.isArray(history.data) ? history.data.map((item: any) => ({
           time: new Date(item.event_at).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }),
           event: item.event,
           status: item.status,
-        })));
+        })) : []);
+      } else {
+        setHistoryRows([]);
       }
     }
     void loadRiskData().catch((error) => console.error("[Situasi] Gagal memuat data Risiko & Prediksi:", error));
@@ -84,8 +103,9 @@ function RiskForecast() {
   const [filters, setFilters] = useState<ActiveFilter[]>([]);
   const [range, setRange] = useState("7 Hari");
   const choose = (value: string) => setFilters([{ type: "indikator", value }]);
-  const risk = situation.risk ?? "Sedang";
-  const growth = situation.growth ?? profile.factors.find((item) => item.factor === "Pertumbuhan Volume")?.change ?? "—";
+  const hasRiskEvidence = profile.dataQuality === "sufficient" && profile.riskScore !== null;
+  const risk = hasRiskEvidence ? profile.spreadPotential : "Belum cukup data";
+  const growth = hasRiskEvidence ? profile.factors.find((item) => item.factor === "Pertumbuhan observasi")?.change ?? "—" : "—";
 
   return <PageShell eyebrow={`Situasi / ${situation.name}`} title="Risiko & Prediksi" description="Memahami tingkat risiko, faktor pendorong, dan kemungkinan perkembangan situasi." actions={<FilterBar onAdvanced={() => setFilters([{ type: "risk", value: `Risiko ${risk}` }])} />}>
     <SituationMeta item={situation} />
@@ -93,17 +113,14 @@ function RiskForecast() {
     <ActiveFilters filters={filters} remove={() => setFilters([])} reset={() => setFilters([])} />
     <div className="space-y-4">
       <MetricGrid items={[
-        { value: risk.toUpperCase(), label: "Level Risiko Saat Ini", onClick: () => setFilters([{ type: "risk", value: `Risiko ${risk}` }]) },
+        { value: hasRiskEvidence ? `${profile.riskScore}/100 · ${risk}` : "Belum cukup data", label: "Level Risiko Saat Ini", onClick: () => setFilters([{ type: "risk", value: `Risiko ${risk}` }]) },
         { value: growth, label: "Pertumbuhan Volume" },
         { value: profile.activeRegions, label: "Wilayah Aktif" },
         { value: profile.warningCount, label: "Early Warning Aktif" },
       ]} />
 
-      <SummaryBlock title="Ringkasan Risiko" copy={`${situation.name} saat ini berada pada tingkat risiko ${risk.toLowerCase()}. Perkembangan terutama dipengaruhi oleh perubahan volume, perluasan aktivitas di ${profile.activeRegions} wilayah, bertambahnya aktor baru, dan penguatan narasi “${profile.drivingNarrative}”.`} highlights={[
-        `Volume berubah ${growth} dibanding periode sebelumnya.`,
-        `Aktivitas terpantau di ${profile.activeRegions} wilayah.`,
-        `${profile.newActors.replace("/", "dalam")} teridentifikasi.`,
-        `Narasi “${profile.drivingNarrative}” menjadi pendorong utama.`,
+      <SummaryBlock title="Ringkasan Risiko" copy={hasRiskEvidence ? `${situation.name} memperoleh skor risiko ${profile.riskScore}/100 (${risk}) berdasarkan ${profile.evidenceCount} observasi aktual dalam 7 hari terakhir.` : `${situation.name} belum dapat diberi skor risiko karena bukti observasi terbaru belum memenuhi ambang minimal.`} highlights={[
+        ...(hasRiskEvidence ? [`Pertumbuhan observasi ${growth}.`, `Aktivitas teramati di ${profile.activeRegions} wilayah.`, `${profile.newActors} aktor teramati.`, `Sentimen negatif ${profile.negativeSentiment}.`] : ["Skor risiko ditahan agar tidak menghasilkan peringatan palsu.", "Diperlukan minimal 5 observasi aktual dalam 7 hari terakhir.", "Data historis yang kedaluwarsa tidak dihitung sebagai kondisi terkini."]),
       ]} />
 
       <Panel title="Faktor Pendorong Risiko" description={`Faktor yang membentuk level risiko ${situation.name}`}>
@@ -120,16 +137,16 @@ function RiskForecast() {
         </Panel>
         <Panel title="Proyeksi Volume" action={<div className="flex gap-1">{["7 Hari", "14 Hari", "30 Hari"].map((item) => <Button key={item} size="sm" variant={range === item ? "secondary" : "ghost"} onClick={() => setRange(item)}>{item}</Button>)}</div>}>
           <ChartContainer config={chartConfig} className="h-64 w-full aspect-auto"><LineChart data={trendRows}><CartesianGrid vertical={false} /><XAxis dataKey="date" /><YAxis /><ChartTooltip content={<ChartTooltipContent />} /><ChartLegend content={<ChartLegendContent />} /><Line dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} /><Line dataKey="forecast" stroke="var(--color-forecast)" strokeWidth={2} strokeDasharray="5 5" /></LineChart></ChartContainer>
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">Berdasarkan pola {situation.name} saat ini, volume percakapan diproyeksikan tetap {risk === "Tinggi" ? "tinggi" : "dinamis"} dalam {range.toLowerCase()} ke depan. Pertumbuhan tambahan dapat terjadi apabila narasi “{profile.drivingNarrative}” menguat atau muncul kejadian lapangan baru.</p>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">Belum ada dasar data yang memadai untuk menyatakan proyeksi volume. Sistem hanya menampilkan proyeksi setelah tersedia data aktual dan metode peramalan yang memadai.</p>
         </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
-        <Panel title="Prediksi Penyebaran"><dl className="grid grid-cols-2 gap-4 text-xs">{[["Potensi Penyebaran", profile.spreadPotential], ["Platform Dominan", situation.platforms.slice(0, 3).join(", ")], ["Wilayah Berkembang", profile.growingRegions], ["Aktor Baru", profile.newActors], ["Narasi Pendorong", profile.drivingNarrative]].map(([label, value]) => <div key={label} className={label === "Narasi Pendorong" ? "col-span-2" : undefined}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl></Panel>
+        <Panel title="Prediksi Penyebaran"><dl className="grid grid-cols-2 gap-4 text-xs">{[["Potensi Penyebaran", hasRiskEvidence ? profile.spreadPotential : "Belum cukup data"], ["Platform Dominan", hasRiskEvidence ? situation.platforms.slice(0, 3).join(", ") : "—"], ["Wilayah Berkembang", hasRiskEvidence ? profile.growingRegions : "—"], ["Aktor Baru", hasRiskEvidence ? profile.newActors : "—"], ["Narasi Pendorong", hasRiskEvidence ? profile.drivingNarrative : "—"]].map(([label, value]) => <div key={label} className={label === "Narasi Pendorong" ? "col-span-2" : undefined}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}</dl></Panel>
         <Panel title="Early Warning" action={<RadioTower className="size-4 text-destructive" />}><div className="divide-y divide-border">{profile.warnings.map((warning) => <div key={warning.title} className="flex items-start gap-3 py-3"><AlertTriangle className={warning.level === "TINGGI" ? "mt-0.5 size-4 text-destructive" : "mt-0.5 size-4 text-chart-3"} /><div className="flex-1"><p className="text-xs font-medium">{warning.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{warning.meta}</p></div><span className="text-[9px] font-semibold">{warning.level}</span></div>)}</div></Panel>
       </div>
 
-      <Panel title="Pola Aktivitas Tidak Biasa" action={<Button variant="outline" size="sm" onClick={() => choose("Indikasi aktivitas terkoordinasi")}>Lihat Detail<ArrowUpRight /></Button>}><p className="text-sm">{profile.unusualActivity}</p><p className="mt-2 text-xs text-muted-foreground">Indikasi aktivitas terkoordinasi — pola ini memerlukan penelaahan lebih lanjut dan tidak menyatakan koordinasi sebagai fakta.</p></Panel>
+      <Panel title="Metode Perhitungan Risiko" action={<Button variant="outline" size="sm" onClick={() => choose("Indikasi aktivitas terkoordinasi")}>Lihat Detail<ArrowUpRight /></Button>}><p className="text-sm">{profile.unusualActivity}</p><p className="mt-2 text-xs text-muted-foreground">Komponen skor: pertumbuhan observasi 35%, jumlah aktor 20%, cakupan wilayah 20%, dan sentimen negatif 25%. Sistem tidak menyimpulkan koordinasi atau manipulasi tanpa bukti terverifikasi.</p></Panel>
 
       <Panel title="Riwayat Peringatan & Penanganan" description="Linimasa peringatan dan status penanganan dari sistem hingga respons operasional">
         <ol className="space-y-4 border-l border-border pl-5">

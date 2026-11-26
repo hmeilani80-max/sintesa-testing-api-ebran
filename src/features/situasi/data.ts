@@ -15,7 +15,7 @@ export type SituationEntry = {
   slug: string;
   name: string;
   source: "Temuan Sistem" | "Topik Pantauan";
-  risk?: "Tinggi" | "Sedang" | "Rendah";
+  risk?: "Tinggi" | "Sedang" | "Rendah" | "Kritis";
   status: string;
   volume: string;
   actors: string;
@@ -31,6 +31,10 @@ export type SituationEntry = {
   regionsGrowing?: string;
   dominantNarrative?: string;
   warningStatus?: string;
+  riskScore?: number;
+  dataQuality?: "sufficient" | "insufficient";
+  evidenceCount?: number;
+  lastObservedAt?: string;
   createdBy?: string;
 };
 

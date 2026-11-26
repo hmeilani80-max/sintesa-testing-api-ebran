@@ -10,6 +10,8 @@ import {
 import type { ReactNode } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
+
+const db = supabase as any;
 import { field, useCloudState } from "@/hooks/use-cloud-state";
 import {
   monitoredTopics,
@@ -206,7 +208,7 @@ export function SituationProvider({
     }
 
     void loadSystemFindings();
-    const channel = supabase
+    const channel = db
       .channel("situasi-findings-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "situasi_system_findings" }, () => {
         void loadSystemFindings();
@@ -214,7 +216,7 @@ export function SituationProvider({
       .subscribe();
     return () => {
       cancelled = true;
-      void supabase.removeChannel(channel);
+      void db.removeChannel(channel);
     };
   }, []);
 

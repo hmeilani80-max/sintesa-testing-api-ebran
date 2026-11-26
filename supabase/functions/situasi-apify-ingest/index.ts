@@ -196,7 +196,7 @@ async function processCategory(
   config: ActorConfig, topics: Topic[], maxItems: number, maxCost: number,
 ) {
   const existing = await rest(base, serviceKey,
-    `situasi_apify_ingestion_runs?source_category=eq.${category}&status=eq.running&actor_run_id=not.is.null&order=started_at.asc&limit=1`) as Record<string, unknown>[];
+    `situasi_apify_ingestion_runs?source_category=eq.${category}&actor_id=eq.${encodeURIComponent(config.actorId)}&status=eq.running&actor_run_id=not.is.null&order=started_at.asc&limit=1`) as Record<string, unknown>[];
   let log = existing?.[0];
 
   if (!log) {
@@ -279,16 +279,24 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Konfigurasi APIFY_API_TOKEN atau Supabase belum lengkap" }, 503);
   }
 
-  let actorConfig: Record<string, ActorConfig>;
+  let rawActorConfig: Record<string, unknown>;
   try {
-    actorConfig = JSON.parse(Deno.env.get("APIFY_SITUASI_ACTORS") ?? "{}");
+    rawActorConfig = JSON.parse(Deno.env.get("APIFY_SITUASI_ACTORS") ?? "{}");
   } catch {
     return json({ error: "APIFY_SITUASI_ACTORS harus berupa JSON valid" }, 503);
   }
-  const configured = CATEGORIES.filter((category) => {
-    const value = actorConfig[category];
-    return !!value && typeof value.actorId === "string" && value.actorId.trim().length > 0 && value.input && typeof value.input === "object";
-  });
+  const actorConfig: Partial<Record<Category, ActorConfig[]>> = {};
+  for (const category of CATEGORIES) {
+    const rawValue = rawActorConfig[category];
+    const candidates = Array.isArray(rawValue) ? rawValue : rawValue ? [rawValue] : [];
+    actorConfig[category] = candidates.filter((value): value is ActorConfig =>
+      !!value && typeof value === "object" &&
+      typeof (value as ActorConfig).actorId === "string" &&
+      (value as ActorConfig).actorId.trim().length > 0 &&
+      !!(value as ActorConfig).input && typeof (value as ActorConfig).input === "object"
+    );
+  }
+  const configured = CATEGORIES.filter((category) => (actorConfig[category]?.length ?? 0) > 0);
   if (!configured.length) return json({ error: "Belum ada Actor news/social/government di APIFY_SITUASI_ACTORS" }, 503);
 
   const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "100") || 100));
@@ -298,10 +306,12 @@ Deno.serve(async (req: Request) => {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];
     const results = [];
     for (const category of configured) {
-      try {
-        results.push(await processCategory(base, serviceKey, apifyToken, category, actorConfig[category], topics, maxItems, maxCost));
-      } catch (error) {
-        results.push({ category, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" });
+      for (const config of actorConfig[category] ?? []) {
+        try {
+          results.push(await processCategory(base, serviceKey, apifyToken, category, config, topics, maxItems, maxCost));
+        } catch (error) {
+          results.push({ category, actorId: config.actorId, status: "failed", error: error instanceof Error ? error.message : "Actor gagal" });
+        }
       }
     }
     const hasFailure = results.some((result) => result.status === "failed");

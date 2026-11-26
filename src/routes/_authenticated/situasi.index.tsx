@@ -106,7 +106,15 @@ function SituationCatalogue() {
       }
     }
     void loadEws();
-    return () => { cancelled = true; };
+    const channel = supabase
+      .channel("situasi-ews-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "situasi_ews" }, () => { void loadEws(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "situasi_system_findings" }, () => { void loadEws(); })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, [findings.length]);
 
   function submit(event: FormEvent<HTMLFormElement>) {

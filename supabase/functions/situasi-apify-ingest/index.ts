@@ -244,7 +244,7 @@ async function consumeDataset(
 
 async function processCategory(
   base: string, serviceKey: string, apifyToken: string, category: Category,
-  config: ActorConfig, topics: Topic[], maxItems: number, maxCost: number,
+  config: ActorConfig, topics: Topic[], maxItems: number, maxCost: number, allowStart: boolean,
 ) {
   const existing = await rest(base, serviceKey,
     `situasi_apify_ingestion_runs?source_category=eq.${category}&actor_id=eq.${encodeURIComponent(config.actorId)}&status=eq.running&actor_run_id=not.is.null&order=started_at.asc&limit=1`) as Record<string, unknown>[];

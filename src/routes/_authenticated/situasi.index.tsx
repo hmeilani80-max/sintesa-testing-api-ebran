@@ -133,7 +133,7 @@ function SituationCatalogue() {
       <section aria-labelledby="ews-title">
         <div className="mb-5 flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-md bg-destructive/10 text-destructive"><RadioTower className="size-4" /></span><div><h2 id="ews-title" className="text-lg font-semibold">EWS / Temuan Sistem</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Situasi yang terdeteksi otomatis berdasarkan lonjakan aktivitas, perubahan pola, risiko, atau indikator tidak biasa.</p></div></div>
         <MetricGrid items={[
-          { value: String(findings.filter((item) => item.status === "Aktif" || item.status === "Baru").length), label: "Temuan Tersimpan" },
+          { value: String(findings.length), label: "Temuan Tersimpan" },
           { value: String(findings.filter((item) => item.dataQuality === "sufficient" && (item.risk === "Tinggi" || item.risk === "Kritis")).length), label: "Risiko Tinggi" },
           { value: String(ewsRows.filter((item) => item.data_quality === "sufficient" && (item.level === "Tinggi" || item.level === "Kritis") && item.handling_status !== "Selesai").length), label: "Early Warning Aktif" },
           { value: String(newFindings24h), label: "Temuan Baru 24 Jam" },

@@ -108,6 +108,7 @@ function SituationSources() {
       description="Pantau pengumpulan berita online, media sosial, dan situs pemerintah melalui Apify."
       actions={<div className="flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm"><Link to="/situasi"><ArrowLeft />Kembali ke Situasi</Link></Button>
+        <Button asChild variant="outline" size="sm"><a href="https://supabase.com/dashboard/project/kaafosgeoxcqeidtzblq/functions/secrets" target="_blank" rel="noreferrer">Atur Secrets<ShieldCheck /></a></Button>
         <Button asChild size="sm"><a href="https://github.com/hmeilani80-max/sintesa-testing-api-ebran/actions/workflows/situasi-apify-ingestion.yml" target="_blank" rel="noreferrer">Jalankan / Pantau Workflow<ExternalLink /></a></Button>
       </div>}
     >

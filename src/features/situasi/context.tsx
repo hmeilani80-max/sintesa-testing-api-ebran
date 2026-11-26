@@ -182,7 +182,7 @@ export function SituationProvider({
           risk: row.data_quality === "sufficient" && (row.risk === "Tinggi" || row.risk === "Sedang" || row.risk === "Rendah" || row.risk === "Kritis")
             ? row.risk
             : undefined,
-          status: row.status,
+          status: row.data_quality === "sufficient" ? row.status : "Menunggu Data",
           volume: row.data_quality === "sufficient" ? formatCount(row.volume) : "—",
           actors: row.data_quality === "sufficient" ? formatCount(row.actor_count) : "—",
           narratives: row.data_quality === "sufficient" ? formatCount(row.narrative_count) : "—",

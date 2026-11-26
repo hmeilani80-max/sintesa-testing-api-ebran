@@ -31,5 +31,5 @@ jobs:
             --request POST \
             --header "x-apify-ingest-secret: $INGEST_SECRET" \
             --header "content-type: application/json" \
-            --data '{}' \
+            --data '{"category":"news","actorId":"mastertools/google-news-scraper"}' \
             "https://kaafosgeoxcqeidtzblq.supabase.co/functions/v1/situasi-apify-ingest"

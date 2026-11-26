@@ -53,16 +53,16 @@ function elementContent(block: string, localName: string): string {
 function elementAttribute(block: string, localName: string, attribute: string): string {
   const tagPattern = new RegExp("<(?:[\\w.-]+:)?" + localName + "\\b([^>]*)\\/?\\s*>", "i");
   const tag = block.match(tagPattern)?.[1] ?? "";
-  const attrPattern = new RegExp("\\b" + attribute + "\\s*=\\s*(['\"])(.*?)\\1", "i");
-  const attr = tag.match(attrPattern);
-  return attr ? attr[2].trim() : "";
+  const doubleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*\"([^\"]*)\"", "i"));
+  const singleQuoted = tag.match(new RegExp("\\b" + attribute + "\\s*=\\s*'([^']*)'", "i"));
+  const attr = doubleQuoted ?? singleQuoted;
 }
 
 function parseFeed(xml: string): Array<{ title: string; description: string; link: string; published: string }> {
-  if (!/<(?:[\\w.-]+:)?(?:rss|feed|rdf:RDF)\\b/i.test(xml)) {
+  if (!/<(?:[A-Za-z0-9_.-]+:)?(?:rss|feed|RDF)\b/i.test(xml)) {
     throw new Error("Respons feed bukan dokumen RSS/Atom XML");
   }
-  const blocks = [...xml.matchAll(/<(?:[\\w.-]+:)?(item|entry)\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?\\1\\s*>/gi)];
+  const blocks = [...xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?(item|entry)\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\1\s*>/gi)];
   return blocks.slice(0, 60).map((match) => {
     const block = match[2];
     const link = elementAttribute(block, "link", "href") || elementContent(block, "link");

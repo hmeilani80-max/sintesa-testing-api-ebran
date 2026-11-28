@@ -107,7 +107,7 @@ function normalizeItem(raw: unknown, category: Category, platformOverride?: stri
   return {
     title: title || content.slice(0, 240),
     content: content.slice(0, 12000),
-    url: safeUrl(firstString(item, ["url", "sourceUrl", "source_url", "link", "permalink", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl"]) ??
+    url: safeUrl(firstString(item, ["link", "url", "permalink", "postUrl", "webVideoUrl", "shareUrl", "canonicalUrl", "sourceUrl", "source_url"]) ??
       firstString(nestedMetadata, ["url", "canonicalUrl", "og:url"])),
     publishedAt,
     platform: platform.slice(0, 80),
@@ -118,6 +118,13 @@ function normalizeItem(raw: unknown, category: Category, platformOverride?: stri
       firstString(nestedMetadata, ["region", "location", "city"]),
     actorName: firstString(item, ["author", "authorName", "username", "accountName", "userName", "ownerUsername", "authorMeta.name", "author.userName"]),
   };
+}
+
+function unwrapApifyData(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const object = value as Record<string, unknown>;
+  return object.data && typeof object.data === "object" && !Array.isArray(object.data)
+    ? object.data as Record<string, unknown> : object;
 }
 
 function apifyActorId(actorId: string): string {
@@ -275,9 +282,9 @@ async function processCategory(
     if (!log?.id) throw new Error(`Tidak dapat membuat log ingestion untuk ${category}`);
     let started: Record<string, unknown>;
     try {
-      started = await apify(apifyToken,
+      started = unwrapApifyData(await apify(apifyToken,
         `actors/${encodeURIComponent(apifyActorId(config.actorId))}/runs?waitForFinish=30&maxTotalChargeUsd=${maxCost}`,
-        "POST", buildActorInput(config, topics, pilotGoogleNews)) as Record<string, unknown>;
+        "POST", buildActorInput(config, topics, pilotGoogleNews)));
     } catch (error) {
       await updateRun(base, serviceKey, String(log.id), {
         status: "failed",
@@ -308,7 +315,7 @@ async function processCategory(
   }
 
   if (!log.actor_run_id) throw new Error(`Log ${category} tidak memiliki actor_run_id`);
-  const actorRun = await apify(apifyToken, `actor-runs/${encodeURIComponent(String(log.actor_run_id))}`) as Record<string, unknown>;
+  const actorRun = unwrapApifyData(await apify(apifyToken, `actor-runs/${encodeURIComponent(String(log.actor_run_id))}`));
   const actorStatus = String(actorRun.status ?? "UNKNOWN");
   if (actorStatus === "RUNNING" || actorStatus === "READY" || actorStatus === "TIMING-OUT") {
     return { category, status: "running", actorRunId: log.actor_run_id };
@@ -348,10 +355,12 @@ Deno.serve(async (req: Request) => {
 
   let requestedCategory: Category;
   let requestedActorId: string;
+  let importRunId = "";
   try {
     const requestBody = await req.json() as Record<string, unknown>;
     requestedCategory = requestBody.category as Category;
     requestedActorId = typeof requestBody.actorId === "string" ? requestBody.actorId.trim() : "";
+    importRunId = typeof requestBody.importRunId === "string" ? requestBody.importRunId.trim() : "";
   } catch {
     return json({ error: "Body wajib JSON dengan category dan actorId." }, 400);
   }
@@ -385,12 +394,37 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Konfigurasi Google News harus tepat satu Actor dengan ID mastertools/google-news-scraper pada APIFY_SITUASI_ACTORS.news." }, 503);
   }
 
-  const maxItems = Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "30") || 30));
+  const maxItems = importRunId ? 50 : Math.min(500, Math.max(1, Number(Deno.env.get("APIFY_MAX_ITEMS") ?? "30") || 30));
   const maxCost = Math.min(25, Math.max(0.5, Number(Deno.env.get("APIFY_MAX_TOTAL_CHARGE_USD") ?? "0.5") || 0.5));
   const maxConcurrentRuns = Math.min(5, Math.max(1, Number(Deno.env.get("APIFY_MAX_CONCURRENT_RUNS") ?? "5") || 5));
   const base = supabaseUrl.replace(/\/$/, "");
   try {
     const topics = await rest(base, serviceKey, "situasi_system_findings?select=slug,name,keywords") as Topic[];
+    if (importRunId) {
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(importRunId)) return json({ error: "Run ID Apify tidak valid." }, 400);
+      const runResponse = await apify(apifyToken, `actor-runs/${encodeURIComponent(importRunId)}`);
+      const actorRun = unwrapApifyData(runResponse);
+      if (String(actorRun.status ?? "") !== "SUCCEEDED") {
+        return json({ error: `Run Apify harus berstatus SUCCEEDED; status saat ini: ${String(actorRun.status ?? "unknown")}.` }, 409);
+      }
+      if (!actorRun.defaultDatasetId) return json({ error: "Run Apify tidak memiliki defaultDatasetId." }, 422);
+      const created = await rest(base, serviceKey, "situasi_apify_ingestion_runs", "POST", {
+        source_category: "news", actor_id: requestedActorId, actor_run_id: importRunId,
+        dataset_id: String(actorRun.defaultDatasetId), status: "running",
+        metadata: { phase: "manual_dataset_import", source: "existing_apify_run", imported_run_id: importRunId, max_items: 50 },
+      }, "return=representation") as Record<string, unknown>[];
+      const log = created?.[0];
+      if (!log?.id) throw new Error("Tidak dapat membuat log impor dataset Apify.");
+      const result = await consumeDataset(base, serviceKey, apifyToken,
+        { ...actorRun, id: log.id, apifyRunId: importRunId }, "news", requestedActorId, "Google News", topics, 50);
+      const finalStatus = result.errors.length ? "partial" : "success";
+      await updateRun(base, serviceKey, String(log.id), {
+        status: finalStatus, finished_at: new Date().toISOString(), dataset_id: result.datasetId,
+        ...result.stats, errors: result.errors,
+        metadata: { phase: "manual_dataset_import_completed", source: "existing_apify_run", imported_run_id: importRunId, actor_status: "SUCCEEDED", max_items: 50 },
+      });
+      return json({ ok: result.errors.length === 0, status: finalStatus, selectedActor: requestedActorId, importedRunId: importRunId, ...result.stats, errors: result.errors, runLogId: log.id });
+    }
     // Count all account-level active runs, including runs started outside this pipeline.
     // Fail closed if Apify cannot provide the count: never risk exceeding the account concurrency limit.
     const activeResponse = await apify(apifyToken, "actor-runs?limit=1000&desc=1") as Record<string, unknown>;

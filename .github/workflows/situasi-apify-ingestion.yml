@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 */3 * * *"
   workflow_dispatch:
+    inputs:
+      import_run_id:
+        description: "Opsional: Run ID Apify SUCCEEDED yang dataset-nya ingin diimpor tanpa menjalankan Actor baru"
+        required: false
+        type: string
 
 concurrency:
   group: situasi-apify-ingestion
@@ -25,11 +30,17 @@ jobs:
       - name: Run Apify ingestion pipeline
         env:
           INGEST_SECRET: ${{ secrets.SITUASI_APIFY_INGEST_SECRET }}
+          IMPORT_RUN_ID: ${{ inputs.import_run_id }}
         run: |
+          if [ -n "$IMPORT_RUN_ID" ]; then
+            BODY=$(jq -cn --arg run_id "$IMPORT_RUN_ID" '{category:"news",actorId:"mastertools/google-news-scraper",importRunId:$run_id}')
+          else
+            BODY='{"category":"news","actorId":"mastertools/google-news-scraper"}'
+          fi
           curl --fail-with-body --silent --show-error \
             --max-time 300 \
             --request POST \
             --header "x-apify-ingest-secret: $INGEST_SECRET" \
             --header "content-type: application/json" \
-            --data '{"category":"news","actorId":"mastertools/google-news-scraper"}' \
+            --data "$BODY" \
             "https://kaafosgeoxcqeidtzblq.supabase.co/functions/v1/situasi-apify-ingest"
